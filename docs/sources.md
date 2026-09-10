@@ -138,19 +138,28 @@ The direct-position contract is based on the frozen runtime rather than an added
   `PX4_GZ_MODEL_NAME` when attaching to an existing model;
 - pinned PX4 `src/modules/simulation/gz_bridge/GZBridge.cpp` subscribes to
   `/world/<world>/pose/info`, selects `Pose.name == _model_name`, and converts position ENU to NED as
-  `[y, x, -z]`;
+  `[y, x, -z]`; the same bridge subscribes to `/world/<world>/clock` and synchronizes PX4 SITL time
+  from Gazebo simulation time;
 - Gazebo Harmonic `src/systems/scene_broadcaster/SceneBroadcaster.cc` publishes that world
   `gz.msgs.Pose_V`, stamps it with simulation time, and stores model entity identity in each
   `Pose.name` / `Pose.id`;
-- ROS Jazzy `ros_gz_bridge/src/convert/geometry_msgs.cpp` preserves `frame_id` and
+- ROS Jazzy `ros_gz_bridge` was audited at branch tip
+  `0fa70cb7c15f7500c495190020dd6292188c8e54`; its `geometry_msgs.cpp` preserves `frame_id` and
   `child_frame_id` when converting a single `gz.msgs.Pose` to
   `geometry_msgs/msg/TransformStamped`;
-- ROS Jazzy `ros_gz_bridge` also supports explicit `GZ_TO_ROS` bridge direction.
+- the same Jazzy bridge supports explicit Gazebo-to-ROS direction using the `[` parameter-bridge
+  syntax, recommends a unidirectional `/clock` bridge, and defaults
+  `override_timestamps_with_wall_time` to `false`;
+- Gazebo Harmonic uses `gz-msgs` 10.x and `gz-transport` 13.x; the runtime package consumes them
+  through the ROS Jazzy `gz_msgs_vendor` and `gz_transport_vendor` dependencies plus the exported
+  `gz-msgs::core` and `gz-transport::core` CMake targets.
 
 The world `Pose_V -> geometry_msgs/msg/PoseArray` mapping is deliberately not used for primary
-position because it does not retain the per-pose Gazebo entity name. A thin runtime relay will select
-the configured F450 instance in Gazebo Transport before `ros_gz_bridge`; that relay and the ROS
-wrapper remain Planned until they can be built and exercised on the Jazzy/Harmonic runtime.
+position because it does not retain the per-pose Gazebo entity name. `simulation/ros2` implements the
+identity-filtering Gazebo relay, the `TransformStamped` ROS adapter and a launch file that starts the
+standard installed `ros_gz_bridge::parameter_bridge`. No F450 SDF or PX4 source is duplicated or
+modified. This source was compile-tested against local interface stubs matching the audited public
+APIs; native Jazzy/Harmonic and SITL execution remain required before runtime validation is claimed.
 
 ## Vicon provenance
 

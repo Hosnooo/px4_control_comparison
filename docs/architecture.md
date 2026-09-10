@@ -86,11 +86,12 @@ transport-independent `simulation_position` library mirrors that identity rule,
 requires exactly one matching model pose, preserves simulation time and converts ENU position to NED
 through the existing frame helper exactly once.
 
-The runtime boundary will use a thin Gazebo relay to copy the selected raw pose onto an
-identity-specific `gz.msgs.Pose` topic, followed by a unidirectional `ros_gz_bridge` conversion to
-`geometry_msgs/msg/TransformStamped`. That representation preserves both `frame_id` and
-`child_frame_id`. The Gazebo and ROS wrappers remain Planned until they can be built and exercised
-against the Jazzy/Harmonic runtime; the pure selection/conversion contract is host-testable now.
+The runtime source binding lives in `simulation/ros2`. A thin Gazebo relay copies the selected raw
+pose onto an identity-specific `gz.msgs.Pose` topic, followed by a unidirectional `ros_gz_bridge`
+conversion to `geometry_msgs/msg/TransformStamped`. The ROS adapter verifies `frame_id` and
+`child_frame_id` before invoking the same canonical conversion. The package is source-implemented and
+compile-tested against local interface stubs; native ROS 2 Jazzy / Gazebo Harmonic build and SITL
+validation remain outstanding.
 
 ## Low-level observability
 

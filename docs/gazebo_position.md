@@ -6,9 +6,11 @@ Simulation uses the Gazebo model pose as the controller's primary position sourc
 that primary position through PX4 estimation, and it does not derive velocity by differentiating the
 Gazebo position.
 
-This milestone implements the ROS/Gazebo-independent selection and conversion contract. The thin
-Gazebo Transport relay and ROS 2 binding remain a later runtime milestone because they must be built
-and exercised against ROS 2 Jazzy and Gazebo Harmonic.
+The transport-independent selection/conversion contract and the thin runtime source binding are now
+implemented. `simulation/ros2` contains the Gazebo Transport relay, the ROS `TransformStamped`
+adapter and the launch-time `ros_gz_bridge` wiring. Native ROS 2 Jazzy / Gazebo Harmonic execution
+remains a validation requirement because those target packages are not installed in the host test
+environment used for this milestone.
 
 ## Frozen source behavior
 
@@ -69,13 +71,32 @@ this adapter.
 ## Timestamp contract
 
 The source timestamp is Gazebo simulation time from the `Pose_V` header. A zero timestamp is valid at
-simulation start; negative or non-finite timestamps are rejected. The runtime ROS integration must
-bridge `/world/default/clock` to `/clock` and use simulation time consistently before freshness is
-validated against `CanonicalState`.
+simulation start; negative or non-finite timestamps are rejected. Pinned PX4 already subscribes to
+`/world/<world>/clock` and synchronizes its SITL clock from the Gazebo `sim` time on every callback.
+The ROS launch bridges that same Gazebo clock to `/clock`; controller-side ROS nodes must set
+`use_sim_time=true` so freshness checks use the same simulation-time domain. The bridge leaves
+`override_timestamps_with_wall_time` at its Jazzy default `false`, so the relayed pose stamp is not
+replaced by wall time.
+
+## ROS/Gazebo runtime package
+
+`simulation/ros2` is the ament package `px4_control_comparison_simulation`. Its dependencies are
+explicit: `geometry_msgs`, `gz_msgs_vendor`, `gz_transport_vendor`, `ros_gz_bridge`, `rosgraph_msgs`,
+`launch`, and `launch_ros`. The package builds a plain Gazebo Transport relay executable and a shared
+message-adapter library. The launch file starts the relay with source-derived defaults
+`world_name=default` and `model_name=f450_0`, then starts the installed `ros_gz_bridge`
+`parameter_bridge` in Gazebo-to-ROS-only mode for both the direct pose and Gazebo clock.
+
+The relay publishes `/model/<model_name>/direct_pose` as `gz.msgs.Pose`. The bridge exposes the same
+ROS topic as `geometry_msgs/msg/TransformStamped`; `/world/<world_name>/clock` is remapped on the ROS
+side to `/clock`. Future ROS controller nodes consuming this path must use simulation time so freshness
+checks compare timestamps in the same clock domain.
 
 ## Runtime validation still required
 
-Before the runtime binding is marked Implemented, validation on Ubuntu 24.04 / ROS 2 Jazzy / Gazebo
-Harmonic must demonstrate the real topic type and rate, exact F450 selection, GZ-to-ROS bridge
-direction, preserved timestamp and frames, and the final ENU-to-NED numeric result. The current host
-unit tests validate only the transport-independent contract.
+The runtime package has been compile-tested with strict GCC/Clang and local interface stubs that match
+the audited Jazzy/Harmonic APIs, and its message-level tests exercise identity, timestamp and ENU-to-NED
+behavior. That is not a substitute for a native target build. Validation on Ubuntu 24.04 / ROS 2 Jazzy /
+Gazebo Harmonic must still run `colcon build`, package tests and the actual F450 SITL path, then prove the
+real topic type/rate, exact `f450_0` selection, GZ-to-ROS-only bridge direction, `/clock`, preserved
+timestamp/frames and the final numeric ENU-to-NED result before runtime validation is claimed.

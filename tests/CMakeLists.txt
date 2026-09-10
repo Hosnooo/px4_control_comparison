@@ -20,6 +20,12 @@ add_test(NAME test_gazebo_position COMMAND test_gazebo_position)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(
+  NAME test_gazebo_runtime_config
+  COMMAND ${Python3_EXECUTABLE} -m unittest tests/test_gazebo_runtime_config.py -v
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_test(
   NAME test_fit_wrench_calibration
   COMMAND ${Python3_EXECUTABLE} -m unittest tests/test_fit_wrench_calibration.py -v
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

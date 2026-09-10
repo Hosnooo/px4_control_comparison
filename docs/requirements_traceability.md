@@ -1,8 +1,9 @@
 # Requirements traceability
 
 This table connects the project requirements to their authoritative implementation or validation
-location. `Implemented` means the item exists in the current repository milestone; `Planned` means it
-belongs to a later milestone and must not be treated as validated yet.
+location. `Implemented` means the item exists and has the listed validation. `Runtime-pending` means
+the source implementation exists but still requires validation on the target ROS/Gazebo runtime.
+`Planned` means the implementation belongs to a later milestone.
 
 | Requirement area | Status | Authority / implementation |
 |---|---|---|
@@ -19,7 +20,7 @@ belongs to a later milestone and must not be treated as validated yet.
 | hardware wrench calibration | Implemented | `HardwareWrenchCalibration`, `experiment/calibration`, fail-closed parser/inversion/fitter tests |
 | four-mode PX4 handoff contract | Implemented | `handoff`, `controller_handoff`, handoff tests, `docs/px4_handoff.md` |
 | Gazebo direct-position core contract | Implemented | `simulation_position`, `test_gazebo_position`, `docs/gazebo_position.md` |
-| Gazebo relay / `ros_gz_bridge` runtime binding | Planned | Jazzy/Harmonic transport wrappers and runtime validation |
+| Gazebo relay / `ros_gz_bridge` runtime binding | Runtime-pending | `simulation/ros2`, stub-interface compile/tests, Jazzy/Harmonic native build and SITL validation outstanding |
 | ROS 2 `rclcpp`/`px4_msgs` transport binding | Planned | ROS node and generated-message interface tests |
 | Vicon experiment adapter | Planned | `experiment/vicon_bridge`, experiment docs |
 | PX4 DDS observability additions | Planned | auditable PX4 patch plus interface tests |
