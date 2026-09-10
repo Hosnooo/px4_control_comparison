@@ -127,6 +127,31 @@ The audited `ANCL/fy690s_ws` lab workspace contains a simulation motor sweep and
 injector, but no measured F450 hardware torque calibration record. It is therefore behavioral
 context only and does not authorize hardware physical-wrench normalization.
 
+## Gazebo direct-position provenance
+
+The direct-position contract is based on the frozen runtime rather than an added vehicle model:
+
+- pinned PX4 `ROMFS/px4fmu_common/init.d-posix/airframes/4022_gz_f450` selects world `default` and
+  model type `f450`;
+- pinned PX4 `ROMFS/px4fmu_common/init.d-posix/px4-rc.gzsim` spawns that type as
+  `f450_<px4_instance>` (normally `f450_0` for the first instance), or uses the exact
+  `PX4_GZ_MODEL_NAME` when attaching to an existing model;
+- pinned PX4 `src/modules/simulation/gz_bridge/GZBridge.cpp` subscribes to
+  `/world/<world>/pose/info`, selects `Pose.name == _model_name`, and converts position ENU to NED as
+  `[y, x, -z]`;
+- Gazebo Harmonic `src/systems/scene_broadcaster/SceneBroadcaster.cc` publishes that world
+  `gz.msgs.Pose_V`, stamps it with simulation time, and stores model entity identity in each
+  `Pose.name` / `Pose.id`;
+- ROS Jazzy `ros_gz_bridge/src/convert/geometry_msgs.cpp` preserves `frame_id` and
+  `child_frame_id` when converting a single `gz.msgs.Pose` to
+  `geometry_msgs/msg/TransformStamped`;
+- ROS Jazzy `ros_gz_bridge` also supports explicit `GZ_TO_ROS` bridge direction.
+
+The world `Pose_V -> geometry_msgs/msg/PoseArray` mapping is deliberately not used for primary
+position because it does not retain the per-pose Gazebo entity name. A thin runtime relay will select
+the configured F450 instance in Gazebo Transport before `ros_gz_bridge`; that relay and the ROS
+wrapper remain Planned until they can be built and exercised on the Jazzy/Harmonic runtime.
+
 ## Vicon provenance
 
 The pinned receiver publishes `geometry_msgs/msg/PoseStamped` and documents ROS 2 Jazzy on Ubuntu 24.04. The lab bridge was consulted as behavioral precedent: pose is converted ENU/FLU to NED/FRD and sent as PX4 `VehicleOdometry`, while velocity and angular velocity are left invalid. This project owns and tests the conversion and additionally publishes direct position for the controller.

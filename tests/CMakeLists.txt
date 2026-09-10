@@ -14,6 +14,10 @@ add_control_test(test_hardware_wrench_calibration)
 add_control_test(test_handoff)
 add_control_test(test_controller_handoff)
 
+add_executable(test_gazebo_position test_gazebo_position.cpp)
+target_link_libraries(test_gazebo_position PRIVATE simulation_position)
+add_test(NAME test_gazebo_position COMMAND test_gazebo_position)
+
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(
   NAME test_fit_wrench_calibration

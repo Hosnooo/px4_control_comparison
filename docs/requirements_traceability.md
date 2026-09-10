@@ -18,9 +18,10 @@ belongs to a later milestone and must not be treated as validated yet.
 | simulation physical wrench normalization | Implemented | `F450WrenchModel`, frozen-chain and forward-reconstruction tests, `docs/physical_wrench_normalization.md` |
 | hardware wrench calibration | Implemented | `HardwareWrenchCalibration`, `experiment/calibration`, fail-closed parser/inversion/fitter tests |
 | four-mode PX4 handoff contract | Implemented | `handoff`, `controller_handoff`, handoff tests, `docs/px4_handoff.md` |
+| Gazebo direct-position core contract | Implemented | `simulation_position`, `test_gazebo_position`, `docs/gazebo_position.md` |
+| Gazebo relay / `ros_gz_bridge` runtime binding | Planned | Jazzy/Harmonic transport wrappers and runtime validation |
 | ROS 2 `rclcpp`/`px4_msgs` transport binding | Planned | ROS node and generated-message interface tests |
 | Vicon experiment adapter | Planned | `experiment/vicon_bridge`, experiment docs |
-| Gazebo direct-position adapter | Planned | `simulation/gazebo_position`, simulation docs |
 | PX4 DDS observability additions | Planned | auditable PX4 patch plus interface tests |
 | common diagnostics | Planned | `FlightDiagnostics.msg`, diagnostics tests |
 | ROS bag and ULog workflow | Planned | recording scripts and validation docs |

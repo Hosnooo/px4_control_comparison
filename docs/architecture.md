@@ -77,6 +77,21 @@ in `px4_handoff.md`.
 
 Only position-source adapters differ. Both feed the same direct-position message into the same controller. The controller always obtains velocity, attitude and rates from PX4. Experiment additionally sends the Vicon pose to PX4 external vision for EKF fusion; it does not estimate velocity.
 
+### Gazebo direct position
+
+The pinned F450 model is used unchanged. Gazebo's world `SceneBroadcaster` publishes
+`/world/default/pose/info` as `gz.msgs.Pose_V`; pinned PX4 selects the exact entry whose `Pose.name`
+matches the runtime model identity (`f450_0` for the first normally spawned instance). The
+transport-independent `simulation_position` library mirrors that identity rule,
+requires exactly one matching model pose, preserves simulation time and converts ENU position to NED
+through the existing frame helper exactly once.
+
+The runtime boundary will use a thin Gazebo relay to copy the selected raw pose onto an
+identity-specific `gz.msgs.Pose` topic, followed by a unidirectional `ros_gz_bridge` conversion to
+`geometry_msgs/msg/TransformStamped`. That representation preserves both `frame_id` and
+`child_frame_id`. The Gazebo and ROS wrappers remain Planned until they can be built and exercised
+against the Jazzy/Harmonic runtime; the pure selection/conversion contract is host-testable now.
+
 ## Low-level observability
 
 The frozen PX4 DDS YAML does not publish every signal required for research diagnostics. The ROS integration milestone will add a small auditable patch that enables only the required existing uORB publications over XRCE-DDS. That patch must not alter controller equations, allocator behavior, or state estimation.

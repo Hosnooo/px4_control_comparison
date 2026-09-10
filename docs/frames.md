@@ -28,7 +28,8 @@ Canonical units:
 
 ## Boundary conversions
 
-ROS/Vicon convention is treated as ENU world with FLU body. The fixed basis-change matrices are
+ROS/Vicon convention is treated as ENU world with FLU body. Gazebo world position is also ENU at the
+simulation-position boundary. The fixed basis-change matrices are
 
 `C_ned_enu = [[0,1,0],[1,0,0],[0,0,-1]]`
 
@@ -45,6 +46,15 @@ A rotation mapping FLU body vectors into ENU world converts as
 `R_ned_frd = C_ned_enu * R_enu_flu * C_frd_flu`.
 
 The inverse conversion uses the transposes; both matrices are involutions, so their transpose equals their inverse.
+
+### Gazebo primary-position boundary
+
+The pinned Gazebo/PX4 source provides F450 model position in ENU metres. The simulation adapter must
+preserve the Gazebo simulation timestamp and model identity, then call `enuToNed()` exactly once:
+
+`[x_north, y_east, z_down] = [y_gz, x_gz, -z_gz]`.
+
+No Gazebo velocity or orientation is used to fill the canonical controller state on this path.
 
 ## Basis-vector checks
 
