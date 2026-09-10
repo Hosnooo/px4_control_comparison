@@ -122,6 +122,8 @@ bool finiteConfig(const F450WrenchConfig &config) {
          std::isfinite(config.esc_speed_min_radps) && config.esc_speed_min_radps >= 0.0 &&
          std::isfinite(config.esc_speed_max_radps) &&
          config.esc_speed_max_radps > config.esc_speed_min_radps &&
+         std::isfinite(config.collective_force_tolerance_n) &&
+         config.collective_force_tolerance_n > 0.0 &&
          std::isfinite(config.moment_tolerance_nm) && config.moment_tolerance_nm > 0.0 &&
          std::isfinite(config.jacobian_condition_limit) &&
          config.jacobian_condition_limit > 1.0 && config.max_iterations > 0;
@@ -165,6 +167,7 @@ F450WrenchConfig frozenF450WrenchConfig() {
   config.motor_thrust_constant_n_per_radps2 = 1.2e-5;
   config.esc_speed_min_radps = 150.0;
   config.esc_speed_max_radps = 1000.0;
+  config.collective_force_tolerance_n = 1e-6;
   config.moment_tolerance_nm = 1e-8;
   config.jacobian_condition_limit = 1e4;
   config.max_iterations = 20;
@@ -234,10 +237,7 @@ F450WrenchResult F450WrenchModel::normalize(
   }
   result.normalized_thrust_body_frd = {0.0, 0.0, -normalized_collective_thrust};
 
-  auto accept = [&](const F450ForwardState &state, int iterations) {
-    result.ok = true;
-    result.status = F450WrenchStatus::success;
-    result.reason.clear();
+  auto capture = [&](const F450ForwardState &state, int iterations) {
     result.normalized_torque_frd = state.normalized_torque_frd;
     result.motor_command = state.motor_command;
     result.rotor_speed_radps = state.rotor_speed_radps;
@@ -260,7 +260,17 @@ F450WrenchResult F450WrenchModel::normalize(
 
     const Vec3 moment_residual = desired_body_moment_frd_nm - state.body_moment_frd_nm;
     if (moment_residual.norm() <= config_.moment_tolerance_nm) {
-      accept(state, iteration);
+      capture(state, iteration);
+      if (std::abs(result.collective_force_residual_n) >
+          config_.collective_force_tolerance_n) {
+        result.status = F450WrenchStatus::infeasible;
+        result.reason =
+            "physical collective force does not match the common PX4 thrust command";
+        return result;
+      }
+      result.ok = true;
+      result.status = F450WrenchStatus::success;
+      result.reason.clear();
       return result;
     }
     if (iteration == config_.max_iterations) {

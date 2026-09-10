@@ -58,28 +58,31 @@ A physical force is first converted to equivalent desired acceleration using the
 
 The mirror is intentionally not "improved" relative to PX4.
 
-## Physical torque normalization
+## Physical wrench normalization
 
 There is no universal PX4 N·m-to-normalized-torque conversion. The implemented normalization
 therefore separates simulation and hardware authority and preserves the common PX4 thrust mapping
-above. It solves torque conditionally at that fixed normalized collective command and reports the
-physical collective-force residual rather than silently applying a simulator-specific thrust map.
+above. It solves torque conditionally at that fixed normalized collective command, forward-
+reconstructs the full physical wrench, and fails closed if either the force or moment request cannot
+be reproduced within the applicable acceptance tolerance.
 
 ### Simulation
 
 `F450WrenchModel` reconstructs the frozen normalized PX4 pseudo-inverse mixer, raw motor command,
-`150 + 850 u` rad/s ESC mapping, quadratic Gazebo rotor thrust, and physical F450 moment. A bounded
+`150 + 850 u` rad/s ESC mapping, quadratic Gazebo rotor thrust, and physical F450 wrench. A bounded
 Newton solve varies normalized body-FRD torque only. Accepted commands reconstruct the requested
-physical moment within tolerance, keep every torque coordinate and raw motor command in range, and
-do not require PX4 sequential desaturation. Allocator geometry and physical SDF geometry remain
-separate because the pinned sources use different arm lengths and yaw ratios.
+collective force and physical moment within tolerance, keep every torque coordinate and raw motor
+command in range, and do not require PX4 sequential desaturation. Allocator geometry and physical
+SDF geometry remain separate because the pinned sources use different arm lengths and yaw ratios.
 
 ### Hardware
 
 `HardwareWrenchCalibration` loads only a strict measured calibration record. The record identifies
 vehicle, date, method, units, source-data hash, validity range, affine coefficient matrix, residual
 metrics, conditioning, and the acceptance limits used during fitting. Runtime acceptance limits
-must be at least as strict. Missing, stale, wrong-vehicle, simulation-tagged, malformed, singular,
-poor-fit, or out-of-range calibration disables hardware `lee_wrench`; there is no Gazebo fallback.
+must be at least as strict. The solved command is accepted only if the measured affine model
+reconstructs both collective force and body moment within the applicable bounds. Missing, stale,
+wrong-vehicle, simulation-tagged, malformed, singular, poor-fit, out-of-range, or reconstruction-
+inconsistent calibration disables hardware `lee_wrench`; there is no Gazebo fallback.
 
 The measured-data workflow and exact CSV schema are in `experiment/calibration/README.md`.

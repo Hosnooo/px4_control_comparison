@@ -43,7 +43,7 @@ int main() {
   checkArrayNear(hover.rotor_speed_radps, {660.0, 660.0, 660.0, 660.0}, 1e-12,
                  "sourced hover rotor speed");
   checkNear(hover.collective_thrust_n, 20.9088, 1e-9,
-            "quadratic Gazebo hover thrust");
+            "quadratic Gazebo thrust at nominal PX4 hover command");
   checkVecNear(hover.body_moment_frd_nm, {}, 1e-12, "symmetric hover moment");
   for (double thrust : {0.20, 0.80}) {
     const auto symmetric = model.forward({}, thrust);
@@ -72,41 +72,55 @@ int main() {
   checkVecNear(positive_yaw.body_moment_frd_nm, {0.0, 0.0, 0.007378272},
                1e-12, "positive physical yaw moment");
 
-  const auto zero_moment = model.normalize(19.84081428, {}, 0.60);
+  const auto zero_moment = model.normalize(hover.collective_thrust_n, {}, 0.60);
   check(zero_moment.ok, zero_moment.reason);
   checkVecNear(zero_moment.normalized_torque_frd, {}, 1e-12,
                "zero physical moment needs zero normalized torque");
   checkNear(zero_moment.normalized_thrust_body_frd.z, -0.60, 1e-12,
             "common normalized thrust remains unchanged");
-  checkNear(zero_moment.collective_force_residual_n, 1.06798572, 1e-9,
-            "nonlinear physical collective residual is reported");
+  checkNear(zero_moment.collective_force_residual_n, 0.0, 1e-9,
+            "zero-moment full-wrench reconstruction");
 
-  const Vec3 combined_moment{0.125065259998842, -0.094496879999126,
-                             0.0075208068};
-  const auto combined = model.normalize(20.0, combined_moment, 0.60);
+  const auto force_mismatch = model.normalize(19.84081428, {}, 0.60);
+  check(!force_mismatch.ok && force_mismatch.status == F450WrenchStatus::infeasible,
+        "collective-force mismatch must fail closed in simulation");
+  checkNear(force_mismatch.collective_force_residual_n, 1.06798572, 1e-9,
+            "rejected simulation result retains force residual diagnostics");
+
+  const Vec3 known_torque{0.02, -0.015, 0.01};
+  const auto combined_forward = model.forward(known_torque, 0.60);
+  check(combined_forward.ok, combined_forward.reason);
+  const Vec3 combined_moment = combined_forward.body_moment_frd_nm;
+  const auto combined = model.normalize(combined_forward.collective_thrust_n,
+                                        combined_moment, 0.60);
   check(combined.ok, combined.reason);
-  checkVecNear(combined.normalized_torque_frd, {0.02, -0.015, 0.01}, 1e-10,
+  checkVecNear(combined.normalized_torque_frd, known_torque, 1e-10,
                "conditional solve recovers the normalized torque");
   checkVecNear(combined.reconstructed_body_moment_frd_nm, combined_moment,
                config.moment_tolerance_nm, "combined physical moment reconstruction");
-  checkNear(combined.reconstructed_collective_thrust_n, 20.9231055, 1e-9,
+  checkNear(combined.reconstructed_collective_thrust_n,
+            combined_forward.collective_thrust_n, 1e-9,
             "combined physical collective reconstruction");
-  checkNear(combined.collective_force_residual_n, 0.9231055, 1e-9,
-            "combined collective residual");
+  checkNear(combined.collective_force_residual_n, 0.0, 1e-9,
+            "combined full-wrench force residual");
 
-  const auto repeated = model.normalize(20.0, combined_moment, 0.60);
+  const auto combined_force_mismatch = model.normalize(20.0, combined_moment, 0.60);
+  check(!combined_force_mismatch.ok &&
+            combined_force_mismatch.status == F450WrenchStatus::infeasible,
+        "mixed-axis moment solution cannot hide a collective-force mismatch");
+
+  const auto repeated = model.normalize(combined_forward.collective_thrust_n,
+                                        combined_moment, 0.60);
   checkVecNear(repeated.normalized_torque_frd, combined.normalized_torque_frd, 0.0,
                "conditional solve is deterministic");
 
   const auto invalid_force = model.normalize(
       std::numeric_limits<double>::quiet_NaN(), {}, 0.60);
-  check(!invalid_force.ok &&
-            invalid_force.status == F450WrenchStatus::invalid_input,
+  check(!invalid_force.ok && invalid_force.status == F450WrenchStatus::invalid_input,
         "non-finite collective demand is rejected");
 
   const auto invalid_thrust = model.normalize(20.0, {}, 1.01);
-  check(!invalid_thrust.ok &&
-            invalid_thrust.status == F450WrenchStatus::invalid_input,
+  check(!invalid_thrust.ok && invalid_thrust.status == F450WrenchStatus::invalid_input,
         "out-of-range normalized thrust is rejected");
   check(!model.forward({1.01, 0.0, 0.0}, 0.60).ok,
         "forward model rejects normalized torque outside PX4 bounds");
@@ -118,15 +132,16 @@ int main() {
   F450WrenchConfig singular_config = config;
   singular_config.physical_rotor_position_frd_m.fill({});
   singular_config.physical_yaw_moment_ratio.fill(0.0);
-  const auto singular = F450WrenchModel(singular_config).normalize(20.0, {0.1, 0.0, 0.0}, 0.60);
+  const auto singular =
+      F450WrenchModel(singular_config).normalize(20.0, {0.1, 0.0, 0.0}, 0.60);
   check(!singular.ok && singular.status == F450WrenchStatus::singular_jacobian,
         "singular physical moment map is rejected");
 
   F450WrenchConfig iteration_limited_config = config;
   iteration_limited_config.max_iterations = 1;
   iteration_limited_config.moment_tolerance_nm = 1e-14;
-  const auto iteration_limited =
-      F450WrenchModel(iteration_limited_config).normalize(20.0, combined_moment, 0.60);
+  const auto iteration_limited = F450WrenchModel(iteration_limited_config).normalize(
+      20.0, combined_moment, 0.60);
   check(!iteration_limited.ok &&
             iteration_limited.status == F450WrenchStatus::no_convergence,
         "iteration limit has a distinct deterministic rejection status");

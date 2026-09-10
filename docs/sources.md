@@ -108,8 +108,10 @@ Frozen model: `PX4-gazebo-models@211175bba52482b8c43975e919f4d93aa2f51a4f`,
 
 Simulation-only quantities traced from that model include:
 
-- mass: `2.0232 kg`;
-- inertia diagonal: `[0.0206535, 0.0206535, 0.040464] kg m²`;
+- base-link mass: `2.0232 kg`;
+- rotor-link mass: `0.0126 kg` each for four rotors;
+- total modeled mass: `2.0736 kg`;
+- base-link inertia diagonal: `[0.0206535, 0.0206535, 0.040464] kg m²`;
 - rotor XY coordinates: `±0.1626345596714 m` in the model axes;
 - maximum rotor velocity: `1032 rad/s`;
 - motor thrust constant: `1.2e-5` in the Gazebo motor model;
@@ -117,7 +119,9 @@ Simulation-only quantities traced from that model include:
 - motor time constants: `0.0125 s` up/down;
 - rotor directions: motors 0/1 CCW, 2/3 CW in the audited SDF.
 
-These are never hardware defaults. The hardware wrench path requires measured calibration.
+The listed inertia is the `base_link` inertial element, not the complete multibody inertia of the
+vehicle. These simulation quantities are never hardware defaults. The hardware wrench path requires
+measured calibration.
 
 The audited `ANCL/fy690s_ws` lab workspace contains a simulation motor sweep and normalized wrench
 injector, but no measured F450 hardware torque calibration record. It is therefore behavioral

@@ -97,6 +97,14 @@ int main() {
   checkNear(result.collective_force_residual_n, 0.0015, 1e-12,
             "measured collective residual");
 
+  const auto force_mismatch =
+      calibration.normalize(18.0, {0.121, -0.129, 0.018}, 0.60);
+  check(!force_mismatch.ok &&
+            force_mismatch.status == HardwareWrenchStatus::reconstruction_failure,
+        "hardware collective-force mismatch must fail closed");
+  checkNear(force_mismatch.collective_force_residual_n, 1.0015, 1e-12,
+            "rejected hardware result retains collective residual diagnostics");
+
   bool missing_file_rejected = false;
   try {
     (void)HardwareWrenchCalibration::loadFromFile(

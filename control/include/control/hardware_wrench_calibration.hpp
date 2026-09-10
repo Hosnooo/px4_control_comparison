@@ -57,6 +57,7 @@ class HardwareWrenchCalibration {
   Vec3 torque_min_{};
   Vec3 torque_max_{};
   Mat3 inverse_moment_torque_block_{};
+  double maximum_collective_reconstruction_error_n_{0.0};
   Vec3 maximum_reconstruction_error_nm_{};
 };
 

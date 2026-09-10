@@ -16,6 +16,7 @@ struct F450WrenchConfig {
   double motor_thrust_constant_n_per_radps2{0.0};
   double esc_speed_min_radps{0.0};
   double esc_speed_max_radps{0.0};
+  double collective_force_tolerance_n{0.0};
   double moment_tolerance_nm{0.0};
   double jacobian_condition_limit{0.0};
   int max_iterations{0};

@@ -7,10 +7,10 @@ three comparison modes. Physical torque normalization is conditional on that fix
 thrust command. It may change normalized body torque, but it must not silently replace the common
 thrust mapping with a simulator-specific collective-thrust inverse.
 
-This choice keeps the controller-boundary comparison interpretable. It also means the nonlinear
-Gazebo motor model will not generally reproduce the requested collective force exactly. The
-normalizer reports that force residual; it does not describe the result as an exact physical-wrench
-inverse.
+That common-thrust invariant does not waive physical-wrench consistency. After solving the physical
+moment, the implementation forward-reconstructs the full wrench. If the fixed common PX4 thrust
+command cannot reproduce the requested collective force within the configured acceptance tolerance,
+`lee_wrench` fails closed for that request instead of reporting a successful physical-wrench inverse.
 
 ## Frozen simulation chain
 
@@ -45,14 +45,15 @@ Newton iteration and backtracking. A result is accepted only when:
 - normalized torque is in `[-1, 1]` on every axis;
 - every raw motor command is in `[0, 1]`, so PX4 desaturation is unnecessary;
 - rotor speeds stay within the sourced ESC/model operating range;
-- the physical moment residual is within the configured tolerance; and
+- the physical moment residual is within the configured tolerance;
+- the reconstructed collective force is within the configured force tolerance of the requested
+  collective force; and
 - the local moment Jacobian is nonsingular and sufficiently conditioned.
 
 The result includes normalized torque, normalized body thrust, raw motor commands, rotor speeds,
 rotor thrusts, reconstructed moment, reconstructed collective thrust, collective-force residual,
-iteration count, and an explicit rejection reason. A collective-force residual alone does not make
-an otherwise feasible torque solution invalid because that residual follows from the approved
-common-thrust invariant.
+iteration count, and an explicit rejection reason. A force residual outside tolerance makes the
+physical-wrench request infeasible under the fixed common-thrust mapping.
 
 ## Hardware calibration
 
@@ -70,15 +71,18 @@ contains:
 - validation limits used to accept or reject the record.
 
 The fitter records its acceptance limits, and runtime limits supplied by the application must be
-at least as strict. The affine model is intentionally modest: it is valid only over its measured operating envelope.
-The fitting utility rejects insufficient, non-finite, rank-deficient, poorly conditioned, or
-high-residual data. The runtime loader repeats structural/provenance/quality checks rather than
-trusting a file produced elsewhere.
+at least as strict. The affine model is intentionally modest: it is valid only over its measured
+operating envelope. The fitting utility rejects insufficient, non-finite, rank-deficient, poorly
+conditioned, or high-residual data. The runtime loader repeats structural/provenance/quality checks
+rather than trusting a file produced elsewhere.
 
-For a fixed common thrust command, the hardware normalizer solves the measured 3-by-3 torque block.
-It rejects missing, malformed, simulation-tagged, singular, poor-fit, stale, wrong-vehicle, or
-out-of-range calibration and any command outside the record's measured envelope. Until a real F450
-record passes those checks, hardware `lee_wrench` remains unavailable.
+For a fixed common thrust command, the hardware normalizer solves the measured 3-by-3 torque block,
+then reconstructs all four physical wrench outputs. The effective collective-force reconstruction
+bound is the stricter of the calibration record's accepted maximum collective residual and the
+runtime acceptance limit. Moment reconstruction uses the configured runtime per-axis tolerance.
+Missing, malformed, simulation-tagged, singular, poor-fit, stale, wrong-vehicle, out-of-range, or
+full-wrench-inconsistent calibration use is rejected. Until a real F450 record passes those checks,
+hardware `lee_wrench` remains unavailable.
 
 ## Verification
 
@@ -88,11 +92,13 @@ Simulation tests use independently calculated golden cases from the pinned F450/
 - positive roll, pitch, and yaw sign cases;
 - simultaneous three-axis moment reconstruction;
 - explicit physical-versus-allocator geometry checks;
-- collective-force residual reporting;
+- exact full-wrench reconstruction for accepted cases;
+- collective-force mismatch rejection;
 - motor/torque saturation and infeasible-request rejection; and
 - deterministic repeatability and forward reconstruction.
 
 Hardware tests cover valid synthetic calibration and rejection of missing fields, wrong authority,
 wrong vehicle, invalid units, non-finite coefficients, inadequate samples, singular/ill-conditioned
-fits, excessive residuals, stale records, and out-of-range commands. A synthetic dataset exercises
-the fitter-to-loader-to-normalizer round trip. Existing controller-core tests remain green.
+fits, excessive residuals, stale records, out-of-range commands, and collective-force reconstruction
+mismatch. A synthetic dataset exercises the fitter-to-loader-to-normalizer round trip. Existing
+controller-core tests remain independent of this normalization policy.

@@ -115,8 +115,7 @@ long long daysFromCivil(int year, unsigned month, unsigned day) {
   year -= month <= 2;
   const int era = (year >= 0 ? year : year - 399) / 400;
   const unsigned year_of_era = static_cast<unsigned>(year - era * 400);
-  const unsigned shifted_month =
-      month > 2 ? month - 3 : month + 9;
+  const unsigned shifted_month = month > 2 ? month - 3 : month + 9;
   const unsigned day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
   const unsigned day_of_era =
       year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
@@ -303,6 +302,9 @@ HardwareWrenchCalibration HardwareWrenchCalibration::loadFromText(
   }
 
   HardwareWrenchCalibration calibration;
+  calibration.maximum_collective_reconstruction_error_n_ =
+      std::min(recorded_maximum_collective_residual,
+               limits.maximum_collective_residual_n);
   calibration.maximum_reconstruction_error_nm_ =
       limits.maximum_reconstruction_error_nm;
   calibration.thrust_min_ = parseDouble(fields.at("thrust_min"), "thrust_min");
@@ -415,16 +417,19 @@ HardwareWrenchResult HardwareWrenchCalibration::normalize(
   result.reconstructed_collective_thrust_n = reconstructed[0];
   result.reconstructed_body_moment_frd_nm =
       {reconstructed[1], reconstructed[2], reconstructed[3]};
+  result.collective_force_residual_n = reconstructed[0] - desired_collective_thrust_n;
   const Vec3 reconstruction_error =
       result.reconstructed_body_moment_frd_nm - desired_body_moment_frd_nm;
-  if (std::abs(reconstruction_error.x) > maximum_reconstruction_error_nm_.x ||
+  if (std::abs(result.collective_force_residual_n) >
+          maximum_collective_reconstruction_error_n_ ||
+      std::abs(reconstruction_error.x) > maximum_reconstruction_error_nm_.x ||
       std::abs(reconstruction_error.y) > maximum_reconstruction_error_nm_.y ||
       std::abs(reconstruction_error.z) > maximum_reconstruction_error_nm_.z) {
     result.status = HardwareWrenchStatus::reconstruction_failure;
-    result.reason = "hardware affine inversion failed reconstruction tolerance";
+    result.reason =
+        "hardware affine inversion failed full-wrench reconstruction tolerance";
     return result;
   }
-  result.collective_force_residual_n = reconstructed[0] - desired_collective_thrust_n;
   result.ok = true;
   result.status = HardwareWrenchStatus::success;
   return result;
