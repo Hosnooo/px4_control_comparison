@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace control {
@@ -15,7 +16,9 @@ Vec3 limitTilt(Vec3 body_z_ned, double max_angle_rad, bool &limited) {
   const double limited_angle = std::min(original_angle, max_angle_rad);
 
   Vec3 horizontal_rejection = body_z_ned - cosine_tilt * world_down_ned;
-  if (horizontal_rejection.squaredNorm() < 1e-12) {
+  // ControlMath::limitTilt() uses FLT_EPSILON because PX4 performs this in float.
+  if (horizontal_rejection.squaredNorm() <
+      static_cast<double>(std::numeric_limits<float>::epsilon())) {
     horizontal_rejection = {1.0, 0.0, 0.0};
   }
 
@@ -32,7 +35,7 @@ Vec3 limitTilt(Vec3 body_z_ned, double max_angle_rad, bool &limited) {
 Px4ThrustNormalization::Px4ThrustNormalization(Px4ThrustConfig config)
     : config_(config), effective_min_thrust_(std::max(config.min_thrust, 0.001)) {
   const bool valid = config_.hover_thrust > 0.0 && std::isfinite(config_.hover_thrust) &&
-                     config_.gravity_mps2 > 0.0 && std::isfinite(config_.gravity_mps2) &&
+                     config_.gravity_mps2 == kPx4OneGmps2 &&
                      config_.tilt_limit_rad >= 0.0 && config_.tilt_limit_rad < 0.5 * kPi &&
                      config_.min_thrust >= 0.0 &&
                      config_.max_thrust > effective_min_thrust_ &&

@@ -20,7 +20,7 @@ void checkVecNear(const Vec3 &actual, const Vec3 &expected, double tolerance,
 Px4ThrustConfig testConfig() {
   Px4ThrustConfig config{};
   config.hover_thrust = 0.5;
-  config.gravity_mps2 = 9.80665;
+  config.gravity_mps2 = kPx4OneGmps2;
   config.tilt_limit_rad = 0.7;
   config.min_thrust = 0.1;
   config.max_thrust = 0.9;
@@ -72,6 +72,14 @@ int main() {
   check(lateral.normalized_thrust_ned.norm() <= config.max_thrust + 1e-12,
         "maximum thrust respected");
 
+  // PX4 treats this nearly parallel body-Z case as parallel using FLT_EPSILON,
+  // then selects +X as ControlMath::limitTilt()'s deterministic rejection axis.
+  const auto near_parallel = normalizer.fromAccelerationSetpoint({0.0, 0.001, 0.0});
+  check(near_parallel.desired_body_z_ned.x > 5e-5,
+        "PX4 float-epsilon near-parallel fallback selects positive X");
+  check(std::abs(near_parallel.desired_body_z_ned.y) < 1e-6,
+        "near-parallel fallback suppresses the tiny original rejection direction");
+
   Px4ThrustConfig limited_config = config;
   limited_config.tilt_limit_rad = 0.2;
   const auto tilt_limited =
@@ -102,6 +110,16 @@ int main() {
     threw = true;
   }
   check(threw, "zero gravity rejected");
+
+  threw = false;
+  try {
+    Px4ThrustConfig non_px4_gravity = config;
+    non_px4_gravity.gravity_mps2 = 9.81;
+    Px4ThrustNormalization invalid(non_px4_gravity);
+  } catch (const std::invalid_argument &) {
+    threw = true;
+  }
+  check(threw, "PX4 mirror rejects a configurable replacement for CONSTANTS_ONE_G");
 
   threw = false;
   try {

@@ -9,3 +9,12 @@ add_control_test(test_lee_controller)
 add_control_test(test_px4_thrust_normalization)
 add_control_test(test_geometric_rate_controller)
 add_control_test(test_px4_attitude_rate_controller)
+add_control_test(test_f450_wrench_model)
+add_control_test(test_hardware_wrench_calibration)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(
+  NAME test_fit_wrench_calibration
+  COMMAND ${Python3_EXECUTABLE} -m unittest tests/test_fit_wrench_calibration.py -v
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

@@ -4,6 +4,9 @@
 
 namespace control {
 
+// PX4's CONSTANTS_ONE_G at the frozen revision.
+constexpr double kPx4OneGmps2 = 9.80665;
+
 struct Px4ThrustConfig {
   double hover_thrust{0.0};
   double gravity_mps2{0.0};

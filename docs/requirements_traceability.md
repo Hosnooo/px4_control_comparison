@@ -15,8 +15,8 @@ belongs to a later milestone and must not be treated as validated yet.
 | rate handoff mathematics | Implemented | `GeometricRateController`, rate tests |
 | PX4 thrust normalization | Implemented | `Px4ThrustNormalization`, source-reference tests |
 | PX4 attitude/rate mirror | Implemented | `Px4AttitudeRateController`, source-reference tests |
-| simulation physical torque normalization | Planned | F450 model/inversion and forward-reconstruction tests |
-| hardware torque calibration | Planned | `experiment/calibration`, calibration schema/gate/tests |
+| simulation physical torque normalization | Implemented | `F450WrenchModel`, frozen-chain and forward-reconstruction tests, `docs/physical_wrench_normalization.md` |
+| hardware torque calibration | Implemented | `HardwareWrenchCalibration`, `experiment/calibration`, fail-closed parser/inversion/fitter tests |
 | four-mode ROS 2 message semantics | Planned | control node and ROS interface tests |
 | Vicon experiment adapter | Planned | `experiment/vicon_bridge`, experiment docs |
 | Gazebo direct-position adapter | Planned | `simulation/gazebo_position`, simulation docs |

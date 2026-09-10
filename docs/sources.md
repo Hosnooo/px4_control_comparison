@@ -63,12 +63,26 @@ The `add_attitude_and_rate_control` workspace branch pins PX4 `aaf993e1f8ff1a4a8
   - hover-thrust/gravity scaling;
   - tilt limiting and body-Z construction;
   - normalized negative body-Z thrust convention.
+  - `ControlMath::limitTilt()` float-epsilon near-parallel fallback.
 - `src/lib/control_allocation/control_allocation/ControlAllocation.cpp`
 - `src/lib/control_allocation/control_allocation/ControlAllocationPseudoInverse.cpp`
 - `src/lib/control_allocation/control_allocation/ControlAllocationSequentialDesaturation.cpp`
 - `src/modules/control_allocator/VehicleActuatorEffectiveness/ActuatorEffectivenessMultirotor.*`
   - effectiveness and control-allocation normalization;
   - sequential desaturation behavior and priority.
+- `ROMFS/px4fmu_common/init.d-posix/airframes/4022_gz_f450`
+  - exact rotor order, allocator positions `+/-0.159 m`, yaw moment ratios `+/-0.014`, simulation
+    ESC minimum `150`, and maximum `1000`.
+- `src/modules/control_allocator/module.yaml`
+  - default `CA_ROTOR${i}_CT=6.5` used because airframe 4022 does not override it.
+- `src/lib/mixer_module/functions/FunctionMotors.hpp`
+  - non-reversible normalized motor control and frozen zero thrust-model-factor semantics.
+- `src/lib/mixer_module/motor_params.c`
+  - default `THR_MDL_FAC=0`, used because airframe 4022 does not override it.
+- `src/lib/mixer_module/mixer_module.cpp/.hpp`
+  - `MixingOutput` output limiting, arming ramp, and configured minimum/maximum mapping.
+- `src/modules/simulation/gz_bridge/GZMixingInterfaceESC.cpp/.hpp`
+  - ESC output publication to the Gazebo motor-speed command topic.
 
 ### PX4 DDS/message semantics
 
@@ -88,7 +102,9 @@ At the frozen PX4 revision, `src/modules/uxrce_dds_client/dds_topics.yaml` expos
 
 ## F450 simulation provenance
 
-Frozen model: `PX4-gazebo-models@211175bba52482b8c43975e919f4d93aa2f51a4f`, `models/f450/model.sdf`.
+Frozen model: `PX4-gazebo-models@211175bba52482b8c43975e919f4d93aa2f51a4f`,
+`models/f450/model.sdf`, available at the pinned PX4 path
+`Tools/simulation/gz/models/f450/model.sdf`.
 
 Simulation-only quantities traced from that model include:
 
@@ -102,6 +118,10 @@ Simulation-only quantities traced from that model include:
 - rotor directions: motors 0/1 CCW, 2/3 CW in the audited SDF.
 
 These are never hardware defaults. The hardware wrench path requires measured calibration.
+
+The audited `ANCL/fy690s_ws` lab workspace contains a simulation motor sweep and normalized wrench
+injector, but no measured F450 hardware torque calibration record. It is therefore behavioral
+context only and does not authorize hardware physical-wrench normalization.
 
 ## Vicon provenance
 
