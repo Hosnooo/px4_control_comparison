@@ -11,6 +11,8 @@ add_control_test(test_geometric_rate_controller)
 add_control_test(test_px4_attitude_rate_controller)
 add_control_test(test_f450_wrench_model)
 add_control_test(test_hardware_wrench_calibration)
+add_control_test(test_handoff)
+add_control_test(test_controller_handoff)
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(

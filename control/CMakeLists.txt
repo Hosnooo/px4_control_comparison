@@ -8,5 +8,7 @@ add_library(control_core
   src/px4_attitude_rate_controller.cpp
   src/f450_wrench_model.cpp
   src/hardware_wrench_calibration.cpp
+  src/handoff.cpp
+  src/controller_handoff.cpp
 )
 target_include_directories(control_core PUBLIC include)

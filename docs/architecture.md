@@ -62,6 +62,17 @@ Offboard runs a source-faithful mirror of the selected PX4 attitude and rate loo
 
 Offboard runs the full physical Lee force/moment controller. Physical collective thrust [N] is converted through the PX4 thrust-normalization semantics; physical moment [N·m] is converted through a separate, provenance-aware `PhysicalTorqueNormalization`. PX4 owns allocation and motors.
 
+## PX4 command boundary
+
+Controller equations remain ROS-independent. `controller_handoff` maps the existing controller
+outputs into one explicit mode-specific command input, and `handoff` validates/serializes that input
+against the pinned PX4 message semantics. Failed validation produces no active offboard field or
+setpoint payload. The later ROS 2 node is therefore limited to state validation, clock/timestamp
+selection, copying source-shaped fields into generated `px4_msgs`, and publishing them.
+
+Exact message fields, frame/unit contracts, Offboard flags, and timestamp semantics are documented
+in `px4_handoff.md`.
+
 ## Simulation and experiment adapters
 
 Only position-source adapters differ. Both feed the same direct-position message into the same controller. The controller always obtains velocity, attitude and rates from PX4. Experiment additionally sends the Vicon pose to PX4 external vision for EKF fusion; it does not estimate velocity.
