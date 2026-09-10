@@ -1,6 +1,6 @@
 # Source provenance
 
-This document is the provenance authority for implementation details. The exact project requirements are retained verbatim in `docs/superpowers/specs/project_specification.md`.
+This document is the provenance authority for implementation details. Coding and commenting conventions are summarized in `engineering_guidelines.md`; architecture and frame contracts are documented separately rather than retaining internal workflow prompts in the public repository.
 
 ## Frozen runtime baseline
 
@@ -24,7 +24,7 @@ The `add_attitude_and_rate_control` workspace branch pins PX4 `aaf993e1f8ff1a4a8
 
 | Source | Revision | What was consulted | Use policy |
 |---|---|---|---|
-| `yliu213/SLSoffset` | branch `offsetQSF`; embedded PX4 pin `4f23cd316d3d043e850ff96ece07556a36ecf885` | Existing Lee/SLS behavior, F450 simulation, attitude/rate/wrench handoffs, SITL wrench inverse | Reference only. Its equations and inverse wrench mapping are not treated as authority. |
+| `yliu213/SLSoffset` | branch `offsetQSF`; audited workspace tip `038bddbe5a2a5c6047d4f0f630e8e8af23e29031`; embedded PX4 pin `4f23cd316d3d043e850ff96ece07556a36ecf885` | Existing Lee/SLS behavior, F450 simulation, attitude/rate/wrench handoffs, SITL wrench inverse | Reference only. The workspace was public during audit; the embedded PX4 fork at the pinned revision was not accessible, so it is not treated as an audited authority. |
 | `ANCL/fy690s_ws` | `main` and `add_attitude_and_rate_control`; branch tip observed `aa06027518b3732358261800ac5675838563a9e7` | Lab dependency pins, Vicon bridge, experiment history, F450/PX4 work | Reference only; dependencies are pinned directly. |
 | `Jaeyoung-Lim/mavros_controllers` | `8b3fff0327b56c415aa24708bea5f37d76307404` | Geometric attitude-error sign cross-check | Reference only. Its moment-to-rate change and empirical thrust map are not mathematical truth. |
 | Lee, Leok, McClamroch, CDC 2010 | DOI `10.1109/CDC.2010.5717652` | Equations (2)-(5), (6)-(14), especially physical thrust (12), moment (13), desired thrust direction (14) | Primary mathematical authority for `LeeController`. |
@@ -84,7 +84,7 @@ Pinned `px4_msgs` definitions establish:
 - `ControlAllocatorStatus`: allocation achievement/unallocated control and per-actuator saturation.
 - `ActuatorMotors.control`: normalized actuator command.
 
-At the frozen PX4 revision, `src/modules/uxrce_dds_client/dds_topics.yaml` exposes the required command inputs, but `vehicle_angular_velocity` is commented out in the publication list and several downstream comparison topics are not exported. This repository therefore carries an explicit source patch for research observability rather than silently changing the baseline or manufacturing derivatives.
+At the frozen PX4 revision, `src/modules/uxrce_dds_client/dds_topics.yaml` exposes the required command inputs, but `vehicle_angular_velocity` is commented out in the publication list and several downstream comparison topics are not exported. The ROS integration milestone will therefore carry an explicit, reviewable source patch for research observability rather than silently changing the baseline or manufacturing derivatives.
 
 ## F450 simulation provenance
 

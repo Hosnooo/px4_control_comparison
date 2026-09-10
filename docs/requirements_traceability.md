@@ -1,27 +1,29 @@
 # Requirements traceability
 
-The verbatim user specification is retained in `docs/superpowers/specs/project_specification.md`. This table points each major requirement area to its implementation/validation authority.
+This table connects the project requirements to their authoritative implementation or validation
+location. `Implemented` means the item exists in the current repository milestone; `Planned` means it
+belongs to a later milestone and must not be treated as validated yet.
 
-| Requirement area | Authority / implementation |
-|---|---|
-| authorization, public destination, workflow | original specification; git history; CI |
-| source audit and exact revisions | `docs/sources.md`, `.gitmodules` |
-| NED/FRD frames and conversion | `docs/frames.md`, `control/include/control/frames.hpp`, frame tests |
-| state sources and timestamps | `CanonicalState`, ROS state adapter, state-validity tests |
-| analytical trajectory derivatives | trajectory library/tests |
-| physical Lee controller | `LeeController`, `docs/control.md`, Lee tests |
-| rate handoff | `GeometricRateController`, rate tests |
-| PX4 thrust normalization | `Px4ThrustNormalization`, golden tests |
-| exact PX4 attitude/rate mirror | `Px4AttitudeRateController`, golden tests |
-| simulation physical torque normalization | F450 model/inversion, forward-reconstruction tests |
-| hardware torque calibration | `experiment/calibration`, calibration schema/gate/tests |
-| four mode message semantics | mode dispatcher and ROS interface tests |
-| Vicon architecture | `experiment/vicon_bridge`, frame tests, experiment docs |
-| Gazebo direct position | `simulation/gazebo_position`, simulation docs |
-| common diagnostics | `FlightDiagnostics.msg`, diagnostics tests |
-| ROS bag + ULog workflow | scripts and validation docs |
-| analysis metrics/plots | `analysis/metrics.py`, `analysis/analyze_flight.py`, tests |
-| safety and stale-state gates | preflight/state validation and tests |
-| SITL progression | `scripts/run_sitl_validation.sh`, `docs/validation.md`, CI/manual workflow |
-| hardware claims | `docs/validation.md`; hardware remains unvalidated without physical evidence |
-| public repository hygiene/license | BSD-3-Clause, `.gitignore`, CI checks |
+| Requirement area | Status | Authority / implementation |
+|---|---|---|
+| coding and commenting conventions | Implemented | `docs/engineering_guidelines.md`, `.clang-format` |
+| source audit and exact revisions | Implemented | `docs/sources.md`, `.gitmodules` |
+| NED/FRD frames and conversion | Implemented | `docs/frames.md`, `control/include/control/frames.hpp`, frame tests |
+| canonical state sources and freshness | Implemented | `CanonicalState`, `validateState`, state tests |
+| analytical trajectory derivatives | Implemented | trajectory library and tests |
+| physical Lee controller | Implemented | `LeeController`, `docs/control.md`, Lee tests |
+| rate handoff mathematics | Implemented | `GeometricRateController`, rate tests |
+| PX4 thrust normalization | Implemented | `Px4ThrustNormalization`, source-reference tests |
+| PX4 attitude/rate mirror | Implemented | `Px4AttitudeRateController`, source-reference tests |
+| simulation physical torque normalization | Planned | F450 model/inversion and forward-reconstruction tests |
+| hardware torque calibration | Planned | `experiment/calibration`, calibration schema/gate/tests |
+| four-mode ROS 2 message semantics | Planned | control node and ROS interface tests |
+| Vicon experiment adapter | Planned | `experiment/vicon_bridge`, experiment docs |
+| Gazebo direct-position adapter | Planned | `simulation/gazebo_position`, simulation docs |
+| PX4 DDS observability additions | Planned | auditable PX4 patch plus interface tests |
+| common diagnostics | Planned | `FlightDiagnostics.msg`, diagnostics tests |
+| ROS bag and ULog workflow | Planned | recording scripts and validation docs |
+| analysis metrics and plots | Planned | `analysis/metrics.py`, `analysis/analyze_flight.py`, tests |
+| SITL progression | Planned | validation scripts and manual/CI workflow |
+| hardware validation claims | Planned | `docs/validation.md`; physical evidence required |
+| public repository hygiene/license | Implemented | BSD-3-Clause, `.gitignore`, provenance documentation |

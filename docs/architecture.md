@@ -68,7 +68,7 @@ Only position-source adapters differ. Both feed the same direct-position message
 
 ## Low-level observability
 
-The frozen PX4 DDS YAML does not publish every signal required for research diagnostics. The repository therefore contains a small auditable patch that enables selected existing uORB publications over XRCE-DDS. It does not alter controller equations, allocator behavior, or state estimation.
+The frozen PX4 DDS YAML does not publish every signal required for research diagnostics. The ROS integration milestone will add a small auditable patch that enables only the required existing uORB publications over XRCE-DDS. That patch must not alter controller equations, allocator behavior, or state estimation.
 
 ## Safety boundary
 

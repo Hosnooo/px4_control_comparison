@@ -58,9 +58,9 @@ A physical force is first converted to equivalent desired acceleration using the
 
 The mirror is intentionally not "improved" relative to PX4.
 
-## Physical torque normalization
+## Physical torque normalization (planned milestone 3)
 
-There is no universal PX4 N·m-to-normalized-torque conversion. This project therefore separates simulation and hardware authority.
+This layer is not implemented in the current controller-core milestone. There is no universal PX4 N·m-to-normalized-torque conversion. This project therefore separates simulation and hardware authority.
 
 ### Simulation
 
