@@ -157,4 +157,18 @@ if(BUILD_TESTING)
   target_include_directories(test_px4_message_adapter PRIVATE test/stubs)
   target_link_libraries(test_px4_message_adapter PRIVATE px4_offboard_ros2_messages)
   add_test(NAME test_px4_message_adapter COMMAND test_px4_message_adapter)
+
+  # Release defines NDEBUG globally, but host tests intentionally use <cassert> for contract checks.
+  # Keep those assertions executable without changing production Release compilation.
+  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    foreach(test_target IN ITEMS
+        test_math test_state_requirements test_trajectory
+        test_geometric_acceleration test_geometric_rate test_lee
+        test_px4_attitude_rate_mirror test_px4_thrust_normalization
+        test_command_types test_command_builder_contract test_offboard_flags
+        test_wrench_normalization test_gazebo_position test_f450_wrench_model
+        test_hardware_wrench_calibration test_px4_message_adapter)
+      target_compile_options(${test_target} PRIVATE -UNDEBUG)
+    endforeach()
+  endif()
 endif()
