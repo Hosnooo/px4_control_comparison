@@ -81,6 +81,9 @@ endif()
 
 add_executable(offboard_controller src/ros2/offboard_controller_node.cpp)
 target_link_libraries(offboard_controller PRIVATE px4_offboard_ros2)
+if(NOT ament_cmake_FOUND)
+  target_include_directories(offboard_controller PRIVATE test/stubs)
+endif()
 
 if(ament_cmake_FOUND)
   add_library(px4_offboard_gazebo_runtime

@@ -29,6 +29,11 @@ class CMakeTargetOwnershipTest(unittest.TestCase):
         self.assertNotIn("px4_state_input.cpp", executable.group(1))
         self.assertNotIn("px4_command_publisher.cpp", executable.group(1))
         self.assertIn("px4_offboard_ros2", cmake)
+        self.assertRegex(
+            cmake,
+            r"(?s)if\(NOT ament_cmake_FOUND\).*?target_include_directories\(offboard_controller PRIVATE test/stubs\).*?endif\(\)",
+            "host builds must compile the real rclcpp node path against audited stubs",
+        )
 
     def test_architecture_doc_names_current_ros2_target(self):
         architecture = (ROOT / "docs/architecture.md").read_text(encoding="utf-8")
