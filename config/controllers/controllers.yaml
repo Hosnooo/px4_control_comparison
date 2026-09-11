@@ -1,0 +1,4 @@
+px4_offboard_controller:
+  ros__parameters:
+    # Required. Launch does not provide an airframe- or experiment-specific default.
+    controller: ""

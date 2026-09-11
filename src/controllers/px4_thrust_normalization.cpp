@@ -1,0 +1,12 @@
+#include "px4_offboard_controllers/controllers/px4_thrust_normalization.hpp"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+namespace px4_offboard { namespace {
+Vec3 limitTilt(Vec3 z,double max,bool&limited){z=normalized(z);const Vec3 down{0,0,1};double c=std::clamp(dot(z,down),-1.0,1.0),a=std::acos(c),la=std::min(a,max);Vec3 h=z-c*down;if(h.squaredNorm()<static_cast<double>(std::numeric_limits<float>::epsilon()))h={1,0,0};if(a>max+1e-12)limited=true;return std::cos(la)*down+std::sin(la)*normalized(h);}
+}
+Px4ThrustNormalization::Px4ThrustNormalization(Px4ThrustConfig c):config_(c),effective_min_thrust_(std::max(c.min_thrust,.001)){bool v=c.hover_thrust>0&&std::isfinite(c.hover_thrust)&&c.gravity_mps2==kPx4OneGmps2&&c.tilt_limit_rad>=0&&c.tilt_limit_rad<.5*kPi&&c.min_thrust>=0&&c.max_thrust>effective_min_thrust_&&c.max_thrust<=1&&c.horizontal_thrust_margin>=0&&c.horizontal_thrust_margin<=c.max_thrust;if(!v)throw std::invalid_argument("invalid PX4 thrust-normalization configuration");}
+Px4ThrustOutput Px4ThrustNormalization::fromAccelerationSetpoint(const Vec3&a)const{if(!a.finite())throw std::invalid_argument("acceleration setpoint is not finite");Px4ThrustOutput o{};o.acceleration_setpoint_ned_mps2=a;double zsf=-config_.gravity_mps2;if(!config_.decouple_horizontal_and_vertical_acceleration)zsf+=a.z;Vec3 bz=normalized({-a.x,-a.y,-zsf});bz=limitTilt(bz,config_.tilt_limit_rad,o.saturated);double tz=a.z*(config_.hover_thrust/config_.gravity_mps2)-config_.hover_thrust;double raw=tz/bz.z;double collective=std::min(raw,-effective_min_thrust_);if(std::abs(collective-raw)>1e-12)o.saturated=true;Vec3 t=bz*collective;double hn=std::hypot(t.x,t.y),max2=config_.max_thrust*config_.max_thrust,ah=std::min(hn,config_.horizontal_thrust_margin),mv2=std::max(0.0,max2-ah*ah);double uz=t.z;t.z=std::max(t.z,-std::sqrt(mv2));if(std::abs(t.z-uz)>1e-12)o.saturated=true;double mh=std::sqrt(std::max(0.0,max2-t.z*t.z));if(hn>mh&&hn>kEps){double s=mh/hn;t.x*=s;t.y*=s;o.saturated=true;}o.normalized_thrust_ned=t;o.desired_body_z_ned=normalized(-t);o.normalized_collective_thrust_magnitude=t.norm();o.normalized_thrust_body_frd={0,0,-o.normalized_collective_thrust_magnitude};return o;}
+Px4ThrustOutput Px4ThrustNormalization::fromPhysicalRotorForce(const Vec3&f,double m)const{if(!f.finite()||!(m>0)||!std::isfinite(m))throw std::invalid_argument("invalid physical rotor force or mass");return fromAccelerationSetpoint(f/m+Vec3{0,0,config_.gravity_mps2});}
+}

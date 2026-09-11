@@ -148,13 +148,10 @@ def write_record(path, args, samples, coefficients, condition, rmse,
         ("output_units", "N_Nm"),
         ("accept_minimum_sample_count", str(args.minimum_samples)),
         ("accept_maximum_condition_number", format_number(args.maximum_condition_number)),
-        ("accept_maximum_collective_rmse_n",
-         format_number(args.maximum_collective_rmse_n)),
+        ("accept_maximum_collective_rmse_n", format_number(args.maximum_collective_rmse_n)),
         ("accept_maximum_moment_rmse_nm", format_number(args.maximum_moment_rmse_nm)),
-        ("accept_maximum_collective_residual_n",
-         format_number(args.maximum_collective_residual_n)),
-        ("accept_maximum_moment_residual_nm",
-         format_number(args.maximum_moment_residual_nm)),
+        ("accept_maximum_collective_residual_n", format_number(args.maximum_collective_residual_n)),
+        ("accept_maximum_moment_residual_nm", format_number(args.maximum_moment_residual_nm)),
         ("thrust_min", format_number(np.min(normalized[:, 0]))),
         ("thrust_max", format_number(np.max(normalized[:, 0]))),
         ("torque_x_min", format_number(np.min(normalized[:, 1]))),
@@ -177,8 +174,7 @@ def write_record(path, args, samples, coefficients, condition, rmse,
     for name, row in zip(coefficient_names, coefficients):
         fields.append((name, ",".join(format_number(value) for value in row)))
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(f"{key}={value}\n" for key, value in fields),
-                    encoding="utf-8")
+    path.write_text("".join(f"{key}={value}\n" for key, value in fields), encoding="utf-8")
 
 
 def main(argv=None):
@@ -187,8 +183,8 @@ def main(argv=None):
         validate_provenance(args)
         samples = read_samples(args.input_csv)
         coefficients, condition, rmse, maximum_residual = fit(samples, args)
-        write_record(args.output_record, args, samples, coefficients, condition,
-                     rmse, maximum_residual)
+        write_record(args.output_record, args, samples, coefficients, condition, rmse,
+                     maximum_residual)
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

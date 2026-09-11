@@ -1,0 +1,16 @@
+#include "px4_offboard_controllers/px4/message_adapter.hpp"
+#include <limits>
+#include <stdexcept>
+namespace px4_offboard { namespace {
+float nanf(){return std::numeric_limits<float>::quiet_NaN();}
+px4_msgs::msg::TrajectorySetpoint blankTrajectory(std::uint64_t ts){px4_msgs::msg::TrajectorySetpoint m{};m.timestamp=ts;m.position={nanf(),nanf(),nanf()};m.velocity={nanf(),nanf(),nanf()};m.acceleration={nanf(),nanf(),nanf()};m.jerk={nanf(),nanf(),nanf()};m.yaw=nanf();m.yawspeed=nanf();return m;}
+}
+px4_msgs::msg::OffboardControlMode toPx4OffboardControlMode(OffboardControlLevel l,std::uint64_t ts){if(!ts)throw std::invalid_argument("zero PX4 timestamp");auto f=offboardFlags(l);px4_msgs::msg::OffboardControlMode m{};m.timestamp=ts;m.position=f.position;m.velocity=f.velocity;m.acceleration=f.acceleration;m.attitude=f.attitude;m.body_rate=f.body_rate;m.thrust_and_torque=f.thrust_and_torque;m.direct_actuator=f.direct_actuator;return m;}
+px4_msgs::msg::TrajectorySetpoint toPx4TrajectorySetpoint(const PositionCommand&c){if(!c.valid())throw std::invalid_argument("invalid position command");auto m=blankTrajectory(c.timestamp_us);m.position={float(c.position_ned.x),float(c.position_ned.y),float(c.position_ned.z)};return m;}
+px4_msgs::msg::TrajectorySetpoint toPx4TrajectorySetpoint(const VelocityCommand&c){if(!c.valid())throw std::invalid_argument("invalid velocity command");auto m=blankTrajectory(c.timestamp_us);m.velocity={float(c.velocity_ned.x),float(c.velocity_ned.y),float(c.velocity_ned.z)};return m;}
+px4_msgs::msg::TrajectorySetpoint toPx4TrajectorySetpoint(const AccelerationCommand&c){if(!c.valid())throw std::invalid_argument("invalid acceleration command");auto m=blankTrajectory(c.timestamp_us);m.acceleration={float(c.acceleration_ned.x),float(c.acceleration_ned.y),float(c.acceleration_ned.z)};return m;}
+px4_msgs::msg::VehicleAttitudeSetpoint toPx4VehicleAttitudeSetpoint(const AttitudeCommand&c){if(!c.valid())throw std::invalid_argument("invalid attitude command");auto q=c.attitude_ned_frd.normalized();px4_msgs::msg::VehicleAttitudeSetpoint m{};m.timestamp=c.timestamp_us;m.q_d={float(q.w),float(q.x),float(q.y),float(q.z)};m.thrust_body={0,0,float(-c.normalized_thrust)};return m;}
+px4_msgs::msg::VehicleRatesSetpoint toPx4VehicleRatesSetpoint(const BodyRateCommand&c){if(!c.valid())throw std::invalid_argument("invalid body-rate command");px4_msgs::msg::VehicleRatesSetpoint m{};m.timestamp=c.timestamp_us;m.roll=float(c.body_rate_frd.x);m.pitch=float(c.body_rate_frd.y);m.yaw=float(c.body_rate_frd.z);m.thrust_body={0,0,float(-c.normalized_thrust)};return m;}
+px4_msgs::msg::VehicleTorqueSetpoint toPx4VehicleTorqueSetpoint(const NormalizedWrenchCommand&c){if(!c.valid())throw std::invalid_argument("invalid wrench command");px4_msgs::msg::VehicleTorqueSetpoint m{};m.timestamp=c.timestamp_us;m.timestamp_sample=c.timestamp_us;m.xyz={float(c.torque_frd.x),float(c.torque_frd.y),float(c.torque_frd.z)};return m;}
+px4_msgs::msg::VehicleThrustSetpoint toPx4VehicleThrustSetpoint(const NormalizedWrenchCommand&c){if(!c.valid())throw std::invalid_argument("invalid wrench command");px4_msgs::msg::VehicleThrustSetpoint m{};m.timestamp=c.timestamp_us;m.timestamp_sample=c.timestamp_us;m.xyz={float(c.thrust_frd.x),float(c.thrust_frd.y),float(c.thrust_frd.z)};return m;}
+}

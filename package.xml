@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>px4_offboard_controllers</name>
+  <version>0.1.0</version>
+  <description>Readable multirotor PX4 offboard controllers with ROS-independent controller math.</description>
+  <maintainer email="110294865+Hosnooo@users.noreply.github.com">Mohssen Elshaar</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>px4_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>rosgraph_msgs</depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>gz_transport_vendor</exec_depend>
+  <exec_depend>gz_msgs_vendor</exec_depend>
+
+  <export><build_type>ament_cmake</build_type></export>
+</package>
