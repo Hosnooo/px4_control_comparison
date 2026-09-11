@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -70,9 +71,12 @@ int main(int argc, char **argv) {
   const auto control_level = px4_offboard::controlLevelFor(*controller_kind);
 
   using namespace std::chrono_literals;
+  // PX4's pinned uXRCE-DDS client synchronizes message timestamps against Agent OS time. Keep
+  // PX4-bound command timestamps on system time even if another ROS node uses Gazebo /clock.
+  const auto px4_clock = std::make_shared<rclcpp::Clock>(RCL_SYSTEM_TIME);
   const auto heartbeat_timer = node->create_wall_timer(
-      100ms, [&command_publisher, node, control_level] {
-    const auto now_ns = node->get_clock()->now().nanoseconds();
+      100ms, [&command_publisher, px4_clock, control_level] {
+    const auto now_ns = px4_clock->now().nanoseconds();
     if (now_ns > 0) {
       command_publisher.publishControlMode(
           control_level, static_cast<std::uint64_t>(now_ns / 1000));

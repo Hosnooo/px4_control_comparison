@@ -19,7 +19,9 @@ only at the ROS/PX4 boundary. Uncontrolled
 `TrajectorySetpoint` position/velocity/acceleration/jerk/yaw dimensions are NaN rather than zero,
 so PX4 does not interpret an unused dimension as an active zero command.
 
-PX4 timestamps are explicit microseconds on command-domain values. Wrench messages copy that
-command time into both `timestamp` and `timestamp_sample`. Arming and mode changes use explicit
-`VehicleCommand` actions and are not controller equations or automatic side effects of selecting
-a controller.
+PX4 timestamps are explicit microseconds on command-domain values. PX4-bound runtime commands use
+ROS system time, not `/clock`: the pinned uXRCE-DDS client synchronizes DDS timestamps against the
+Agent OS clock and translates them to PX4 time. This remains true if Gazebo state consumers use
+simulation time elsewhere. Wrench messages copy command time into both `timestamp` and
+`timestamp_sample`. Arming and mode changes use explicit `VehicleCommand` actions and are not
+controller equations or automatic side effects of selecting a controller.

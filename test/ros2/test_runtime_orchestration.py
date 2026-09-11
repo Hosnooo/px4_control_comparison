@@ -10,6 +10,11 @@ class RuntimeOrchestrationTest(unittest.TestCase):
         self.assertIn("controlLevelFor(*controller_kind)", source)
         self.assertIn("create_wall_timer", source)
         self.assertIn("publishControlMode", source)
+        self.assertIn("RCL_SYSTEM_TIME", source)
+        self.assertNotIn("node->get_clock()->now()", source)
+        docs = (ROOT / "docs/px4_interface.md").read_text(encoding="utf-8")
+        self.assertIn("system time", docs.lower())
+        self.assertIn("uxrce-dds", docs.lower())
 
     def test_vehicle_commands_are_explicit_typed_actions(self):
         header = (ROOT / "src/ros2/runtime.hpp").read_text(encoding="utf-8")
