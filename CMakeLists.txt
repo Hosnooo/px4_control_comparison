@@ -58,11 +58,28 @@ if(ament_cmake_FOUND)
   find_package(rclcpp REQUIRED)
   find_package(px4_msgs REQUIRED)
   find_package(geometry_msgs REQUIRED)
+  find_package(gz_msgs_vendor REQUIRED)
+  find_package(gz-msgs REQUIRED)
+  find_package(gz_transport_vendor REQUIRED)
+  find_package(gz-transport REQUIRED)
 
   add_library(px4_offboard_ros2_messages src/ros2/px4_message_adapter.cpp)
   target_link_libraries(px4_offboard_ros2_messages PUBLIC px4_offboard_px4)
   target_include_directories(px4_offboard_ros2_messages PUBLIC include)
   ament_target_dependencies(px4_offboard_ros2_messages px4_msgs)
+
+  add_library(px4_offboard_gazebo_runtime SHARED
+    src/ros2/gazebo_pose_relay.cpp
+    src/ros2/gazebo_position_ros.cpp)
+  target_include_directories(px4_offboard_gazebo_runtime PRIVATE src/ros2)
+  target_link_libraries(px4_offboard_gazebo_runtime
+    PRIVATE px4_offboard_state_sources gz-msgs::core)
+  ament_target_dependencies(px4_offboard_gazebo_runtime geometry_msgs)
+
+  add_executable(gazebo_pose_relay src/ros2/gazebo_pose_relay_main.cpp)
+  target_include_directories(gazebo_pose_relay PRIVATE src/ros2)
+  target_link_libraries(gazebo_pose_relay
+    PRIVATE px4_offboard_gazebo_runtime gz-transport::core)
 
   add_executable(offboard_controller
     src/ros2/offboard_controller_node.cpp
@@ -73,7 +90,8 @@ if(ament_cmake_FOUND)
   ament_target_dependencies(offboard_controller rclcpp px4_msgs)
 
   install(TARGETS px4_offboard_controllers_lib px4_offboard_px4 px4_offboard_state_sources
-                  px4_offboard_f450 px4_offboard_ros2_messages offboard_controller
+                  px4_offboard_f450 px4_offboard_ros2_messages px4_offboard_gazebo_runtime
+                  gazebo_pose_relay offboard_controller
     DESTINATION lib/${PROJECT_NAME})
   install(DIRECTORY include/ DESTINATION include)
   install(DIRECTORY vehicles/f450/include/ DESTINATION include)
