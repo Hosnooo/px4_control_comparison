@@ -1,14 +1,173 @@
 #include "px4_offboard_controllers/controllers/px4_attitude_rate_mirror.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
-namespace px4_offboard { namespace {
-constexpr double kRateDtMinS=.000125,kRateDtMaxS=.02,kIntegratorReductionRateRadps=400.0*kPi/180.0;
-double clampUnit(double v){return std::clamp(v,-1.0,1.0);} bool nonNegative(const Vec3&v){return v.finite()&&v.x>=0&&v.y>=0&&v.z>=0;}
-Quat px4QuaternionFromTwoVectors(const Vec3&from,const Vec3&to){if(from.squaredNorm()<=kEps||to.squaredNorm()<=kEps||!from.finite()||!to.finite())throw std::invalid_argument("cannot construct rotation from zero/invalid vector");Vec3 cp=cross(from,to);double dp=dot(from,to);if(cp.norm()<1e-5&&dp<0){Vec3 a{std::abs(from.x),std::abs(from.y),std::abs(from.z)},basis{};if(a.x<a.y)basis=a.x<a.z?Vec3{1,0,0}:Vec3{0,0,1};else basis=a.y<a.z?Vec3{0,1,0}:Vec3{0,0,1};cp=cross(from,basis);return Quat{0,cp.x,cp.y,cp.z}.normalized();}double real=dp+std::sqrt(from.squaredNorm()*to.squaredNorm());return Quat{real,cp.x,cp.y,cp.z}.normalized();}
+
+namespace px4_offboard {
+namespace {
+
+constexpr double kRateDtMinS = 0.000125;
+constexpr double kRateDtMaxS = 0.02;
+constexpr double kIntegratorReductionRateRadps = 400.0 * kPi / 180.0;
+
+double clampUnit(double value) { return std::clamp(value, -1.0, 1.0); }
+
+bool nonNegative(const Vec3 &value) {
+  return value.finite() && value.x >= 0.0 && value.y >= 0.0 && value.z >= 0.0;
 }
-Px4AttitudeRateController::Px4AttitudeRateController(Px4AttitudeConfig a,Px4RateConfig r):attitude_(a),rate_(r),attitude_gain_(a.proportional_gain),effective_rate_p_(hadamard(r.k,r.p)),effective_rate_i_(hadamard(r.k,r.i)),effective_rate_d_(hadamard(r.k,r.d)){bool va=nonNegative(a.proportional_gain)&&a.rate_limit_radps.finite()&&std::isfinite(a.yaw_weight)&&a.rate_limit_radps.x>0&&a.rate_limit_radps.y>0&&a.rate_limit_radps.z>0;bool vr=nonNegative(r.k)&&nonNegative(r.p)&&nonNegative(r.i)&&nonNegative(r.d)&&nonNegative(r.ff)&&nonNegative(r.integrator_limit)&&std::isfinite(r.yaw_torque_cutoff_hz)&&r.yaw_torque_cutoff_hz>=0;if(!va||!vr)throw std::invalid_argument("invalid PX4 attitude/rate mirror configuration");attitude_.yaw_weight=std::clamp(attitude_.yaw_weight,0.0,1.0);if(attitude_.yaw_weight>1e-4)attitude_gain_.z/=attitude_.yaw_weight;}
-Vec3 Px4AttitudeRateController::attitudeUpdate(const Quat&curq,const Quat&desq,double yaw_speed)const{Quat cur=curq.normalized(),des=desq.normalized();Quat reduced=px4QuaternionFromTwoVectors(cur.dcmZ(),des.dcmZ());if(std::abs(reduced.x)>1-1e-5||std::abs(reduced.y)>1-1e-5)reduced=des;else reduced=(reduced*cur).normalized();Quat dy=(reduced.inverse()*des).canonical();dy.w=clampUnit(dy.w);dy.z=clampUnit(dy.z);double yw=attitude_.yaw_weight;Quat wy{std::cos(yw*std::acos(dy.w)),0,0,std::sin(yw*std::asin(dy.z))};des=(reduced*wy).normalized();Quat eq=(cur.inverse()*des).canonical();Vec3 e{2*eq.x,2*eq.y,2*eq.z};Vec3 sp=hadamard(e,attitude_gain_);if(std::isfinite(yaw_speed))sp+=cur.inverse().dcmZ()*yaw_speed;return clamped(sp,attitude_.rate_limit_radps);}
-Px4RateOutput Px4AttitudeRateController::rateUpdate(const RateControlInput&i){if(!i.body_rate_frd_radps.finite()||!i.body_rate_setpoint_frd_radps.finite()||!i.body_angular_accel_frd_radps2.finite()||!i.normalized_thrust_body_frd.finite()||!std::isfinite(i.dt_s)||i.dt_s<0)throw std::invalid_argument("invalid PX4 rate mirror input");last_dt_s_=std::clamp(i.dt_s,kRateDtMinS,kRateDtMaxS);if(!i.armed)rate_integral_={};Vec3 err=i.body_rate_setpoint_frd_radps-i.body_rate_frd_radps;Vec3 torque=hadamard(effective_rate_p_,err)+rate_integral_-hadamard(effective_rate_d_,i.body_angular_accel_frd_radps2)+hadamard(rate_.ff,i.body_rate_setpoint_frd_radps);if(!i.landed_or_maybe_landed){for(std::size_t axis=0;axis<3;++axis){double e=err[axis];if(i.saturation_positive[axis])e=std::min(e,0.0);if(i.saturation_negative[axis])e=std::max(e,0.0);double f=e/kIntegratorReductionRateRadps;f=std::max(0.0,1.0-f*f);double cand=rate_integral_[axis]+f*effective_rate_i_[axis]*e*last_dt_s_;if(std::isfinite(cand))rate_integral_[axis]=std::clamp(cand,-rate_.integrator_limit[axis],rate_.integrator_limit[axis]);}}double tau=rate_.yaw_torque_cutoff_hz>kEps?1.0/(2*kPi*rate_.yaw_torque_cutoff_hz):0.0;double alpha=last_dt_s_/(tau+last_dt_s_);yaw_filter_state_+=alpha*(torque.z-yaw_filter_state_);torque.z=yaw_filter_state_;Vec3 thrust=i.normalized_thrust_body_frd;if(rate_.battery_scaling_enabled&&std::isfinite(i.battery_scale)&&i.battery_scale>0){torque=clamped(torque*i.battery_scale,{1,1,1});thrust=clamped(thrust*i.battery_scale,{1,1,1});}return{torque,thrust,rate_integral_};}
-void Px4AttitudeRateController::reset(){rate_integral_={};yaw_filter_state_=0;last_dt_s_=0;}
+
+Quat px4QuaternionFromTwoVectors(const Vec3 &from, const Vec3 &to) {
+  if (from.squaredNorm() <= kEps || to.squaredNorm() <= kEps || !from.finite() ||
+      !to.finite()) {
+    throw std::invalid_argument("cannot construct rotation from zero/invalid vector");
+  }
+
+  Vec3 cross_product = cross(from, to);
+  const double dot_product = dot(from, to);
+  if (cross_product.norm() < 1e-5 && dot_product < 0.0) {
+    const Vec3 absolute{std::abs(from.x), std::abs(from.y), std::abs(from.z)};
+    Vec3 basis{};
+    if (absolute.x < absolute.y) {
+      basis = absolute.x < absolute.z ? Vec3{1.0, 0.0, 0.0} : Vec3{0.0, 0.0, 1.0};
+    } else {
+      basis = absolute.y < absolute.z ? Vec3{0.0, 1.0, 0.0} : Vec3{0.0, 0.0, 1.0};
+    }
+    cross_product = cross(from, basis);
+    return Quat{0.0, cross_product.x, cross_product.y, cross_product.z}.normalized();
+  }
+
+  const double real = dot_product + std::sqrt(from.squaredNorm() * to.squaredNorm());
+  return Quat{real, cross_product.x, cross_product.y, cross_product.z}.normalized();
 }
+
+}  // namespace
+
+Px4AttitudeRateController::Px4AttitudeRateController(Px4AttitudeConfig attitude,
+                                                     Px4RateConfig rate)
+    : attitude_(attitude),
+      rate_(rate),
+      attitude_gain_(attitude.proportional_gain),
+      effective_rate_p_(hadamard(rate.k, rate.p)),
+      effective_rate_i_(hadamard(rate.k, rate.i)),
+      effective_rate_d_(hadamard(rate.k, rate.d)) {
+  const bool valid_attitude = nonNegative(attitude.proportional_gain) &&
+                              attitude.rate_limit_radps.finite() &&
+                              std::isfinite(attitude.yaw_weight) &&
+                              attitude.rate_limit_radps.x > 0.0 &&
+                              attitude.rate_limit_radps.y > 0.0 &&
+                              attitude.rate_limit_radps.z > 0.0;
+  const bool valid_rate = nonNegative(rate.k) && nonNegative(rate.p) && nonNegative(rate.i) &&
+                          nonNegative(rate.d) && nonNegative(rate.ff) &&
+                          nonNegative(rate.integrator_limit) &&
+                          std::isfinite(rate.yaw_torque_cutoff_hz) &&
+                          rate.yaw_torque_cutoff_hz >= 0.0;
+  if (!valid_attitude || !valid_rate) {
+    throw std::invalid_argument("invalid PX4 attitude/rate mirror configuration");
+  }
+
+  attitude_.yaw_weight = std::clamp(attitude_.yaw_weight, 0.0, 1.0);
+  if (attitude_.yaw_weight > 1e-4) {
+    // PX4 compensates the yaw gain so yaw_weight changes authority without changing the tuned
+    // small-angle yaw gain.
+    attitude_gain_.z /= attitude_.yaw_weight;
+  }
+}
+
+Vec3 Px4AttitudeRateController::attitudeUpdate(const Quat &current_ned_frd,
+                                               const Quat &desired_ned_frd,
+                                               double yaw_speed_setpoint_radps) const {
+  const Quat current = current_ned_frd.normalized();
+  Quat desired = desired_ned_frd.normalized();
+
+  // Preserve PX4's reduced-attitude construction: align body-Z first, then mix in yaw.
+  Quat reduced = px4QuaternionFromTwoVectors(current.dcmZ(), desired.dcmZ());
+  if (std::abs(reduced.x) > 1.0 - 1e-5 || std::abs(reduced.y) > 1.0 - 1e-5) {
+    reduced = desired;
+  } else {
+    reduced = (reduced * current).normalized();
+  }
+
+  Quat delta_yaw = (reduced.inverse() * desired).canonical();
+  delta_yaw.w = clampUnit(delta_yaw.w);
+  delta_yaw.z = clampUnit(delta_yaw.z);
+  const double yaw_weight = attitude_.yaw_weight;
+  const Quat weighted_yaw{std::cos(yaw_weight * std::acos(delta_yaw.w)), 0.0, 0.0,
+                          std::sin(yaw_weight * std::asin(delta_yaw.z))};
+  desired = (reduced * weighted_yaw).normalized();
+
+  const Quat error_quaternion = (current.inverse() * desired).canonical();
+  const Vec3 attitude_error{2.0 * error_quaternion.x, 2.0 * error_quaternion.y,
+                            2.0 * error_quaternion.z};
+  Vec3 rate_setpoint = hadamard(attitude_error, attitude_gain_);
+  if (std::isfinite(yaw_speed_setpoint_radps)) {
+    rate_setpoint += current.inverse().dcmZ() * yaw_speed_setpoint_radps;
+  }
+  return clamped(rate_setpoint, attitude_.rate_limit_radps);
+}
+
+Px4RateOutput Px4AttitudeRateController::rateUpdate(const RateControlInput &input) {
+  if (!input.body_rate_frd_radps.finite() ||
+      !input.body_rate_setpoint_frd_radps.finite() ||
+      !input.body_angular_accel_frd_radps2.finite() ||
+      !input.normalized_thrust_body_frd.finite() || !std::isfinite(input.dt_s) ||
+      input.dt_s < 0.0) {
+    throw std::invalid_argument("invalid PX4 rate mirror input");
+  }
+
+  last_dt_s_ = std::clamp(input.dt_s, kRateDtMinS, kRateDtMaxS);
+  if (!input.armed) {
+    rate_integral_ = {};
+  }
+
+  const Vec3 rate_error = input.body_rate_setpoint_frd_radps - input.body_rate_frd_radps;
+  Vec3 torque = hadamard(effective_rate_p_, rate_error) + rate_integral_ -
+                hadamard(effective_rate_d_, input.body_angular_accel_frd_radps2) +
+                hadamard(rate_.ff, input.body_rate_setpoint_frd_radps);
+
+  if (!input.landed_or_maybe_landed) {
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+      double error = rate_error[axis];
+      if (input.saturation_positive[axis]) {
+        error = std::min(error, 0.0);
+      }
+      if (input.saturation_negative[axis]) {
+        error = std::max(error, 0.0);
+      }
+
+      // This is PX4's error-dependent integrator reduction, not a generic anti-windup rule.
+      const double normalized_error = error / kIntegratorReductionRateRadps;
+      const double reduction = std::max(0.0, 1.0 - normalized_error * normalized_error);
+      const double candidate = rate_integral_[axis] +
+                               reduction * effective_rate_i_[axis] * error * last_dt_s_;
+      if (std::isfinite(candidate)) {
+        rate_integral_[axis] = std::clamp(candidate, -rate_.integrator_limit[axis],
+                                          rate_.integrator_limit[axis]);
+      }
+    }
+  }
+
+  const double time_constant = rate_.yaw_torque_cutoff_hz > kEps
+                                   ? 1.0 / (2.0 * kPi * rate_.yaw_torque_cutoff_hz)
+                                   : 0.0;
+  const double alpha = last_dt_s_ / (time_constant + last_dt_s_);
+  yaw_filter_state_ += alpha * (torque.z - yaw_filter_state_);
+  torque.z = yaw_filter_state_;
+
+  Vec3 thrust = input.normalized_thrust_body_frd;
+  if (rate_.battery_scaling_enabled && std::isfinite(input.battery_scale) &&
+      input.battery_scale > 0.0) {
+    torque = clamped(torque * input.battery_scale, {1.0, 1.0, 1.0});
+    thrust = clamped(thrust * input.battery_scale, {1.0, 1.0, 1.0});
+  }
+
+  return {torque, thrust, rate_integral_};
+}
+
+void Px4AttitudeRateController::reset() {
+  rate_integral_ = {};
+  yaw_filter_state_ = 0.0;
+  last_dt_s_ = 0.0;
+}
+
+}  // namespace px4_offboard

@@ -1,17 +1,347 @@
 #include "px4_offboard_controllers/vehicles/f450/wrench_model.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
-namespace px4_offboard::vehicles::f450 { namespace {
-using Matrix4=std::array<std::array<double,4>,4>;
-Matrix4 invert4(Matrix4 m){Matrix4 inv{};for(size_t r=0;r<4;++r)inv[r][r]=1;for(size_t c=0;c<4;++c){size_t p=c;for(size_t r=c+1;r<4;++r)if(std::abs(m[r][c])>std::abs(m[p][c]))p=r;if(std::abs(m[p][c])<=kEps)throw std::invalid_argument("singular F450 allocator effectiveness matrix");std::swap(m[c],m[p]);std::swap(inv[c],inv[p]);double d=m[c][c];for(size_t e=0;e<4;++e){m[c][e]/=d;inv[c][e]/=d;}for(size_t r=0;r<4;++r){if(r==c)continue;double f=m[r][c];for(size_t e=0;e<4;++e){m[r][e]-=f*m[c][e];inv[r][e]-=f*inv[c][e];}}}return inv;}
-Matrix4 makeMixer(const F450WrenchConfig&c){Matrix4 e{};for(size_t i=0;i<4;++i){double k=c.allocator_thrust_coefficient[i];auto&p=c.allocator_rotor_position_frd_m[i];e[0][i]=-k*p.y;e[1][i]=k*p.x;e[2][i]=k*c.allocator_yaw_moment_ratio[i];e[3][i]=-k;}auto m=invert4(e);auto scale=[&](size_t a){double n=0;int nz=0;for(auto&row:m){n+=row[a]*row[a];if(std::abs(row[a])>1e-3)++nz;}return nz?std::sqrt(n/(double(nz)/2.0)):0.0;};double rp=std::max(scale(0),scale(1)), ys=-std::numeric_limits<double>::infinity(), ts=0;int tn=0;for(auto&row:m){ys=std::max(ys,row[2]);if(std::abs(row[3])>std::numeric_limits<float>::epsilon()){ts+=std::abs(row[3]);++tn;}}ts=tn?ts/tn:0;if(!(rp>kEps&&ys>kEps&&ts>kEps))throw std::invalid_argument("invalid F450 allocator normalization scale");for(auto&row:m){row[0]/=rp;row[1]/=rp;row[2]/=ys;row[3]/=ts;for(double&v:row)if(std::abs(v)<1e-3)v=0;}return m;}
-bool finiteCfg(const F450WrenchConfig&c){for(size_t i=0;i<4;++i)if(!c.allocator_rotor_position_frd_m[i].finite()||!c.physical_rotor_position_frd_m[i].finite()||!std::isfinite(c.allocator_thrust_coefficient[i])||!std::isfinite(c.allocator_yaw_moment_ratio[i])||!std::isfinite(c.physical_yaw_moment_ratio[i])||!(c.allocator_thrust_coefficient[i]>0))return false;return std::isfinite(c.motor_thrust_constant_n_per_radps2)&&c.motor_thrust_constant_n_per_radps2>0&&std::isfinite(c.esc_speed_min_radps)&&c.esc_speed_min_radps>=0&&std::isfinite(c.esc_speed_max_radps)&&c.esc_speed_max_radps>c.esc_speed_min_radps&&std::isfinite(c.collective_force_tolerance_n)&&c.collective_force_tolerance_n>0&&std::isfinite(c.moment_tolerance_nm)&&c.moment_tolerance_nm>0&&std::isfinite(c.jacobian_condition_limit)&&c.jacobian_condition_limit>1&&c.max_iterations>0;}
-double infNorm(const Mat3&m){double n=0;for(size_t r=0;r<3;++r){double s=0;for(size_t c=0;c<3;++c)s+=std::abs(m(r,c));n=std::max(n,s);}return n;} bool inBounds(const Vec3&t){return std::abs(t.x)<=1&&std::abs(t.y)<=1&&std::abs(t.z)<=1;}
+
+namespace px4_offboard::vehicles::f450 {
+namespace {
+
+using Matrix4 = std::array<std::array<double, 4>, 4>;
+
+Matrix4 invert4(Matrix4 matrix) {
+  Matrix4 inverse_matrix{};
+  for (std::size_t row = 0; row < 4; ++row) {
+    inverse_matrix[row][row] = 1.0;
+  }
+
+  for (std::size_t column = 0; column < 4; ++column) {
+    std::size_t pivot = column;
+    for (std::size_t row = column + 1; row < 4; ++row) {
+      if (std::abs(matrix[row][column]) > std::abs(matrix[pivot][column])) {
+        pivot = row;
+      }
+    }
+    if (std::abs(matrix[pivot][column]) <= kEps) {
+      throw std::invalid_argument("singular F450 allocator effectiveness matrix");
+    }
+
+    std::swap(matrix[column], matrix[pivot]);
+    std::swap(inverse_matrix[column], inverse_matrix[pivot]);
+    const double diagonal = matrix[column][column];
+    for (std::size_t element = 0; element < 4; ++element) {
+      matrix[column][element] /= diagonal;
+      inverse_matrix[column][element] /= diagonal;
+    }
+
+    for (std::size_t row = 0; row < 4; ++row) {
+      if (row == column) {
+        continue;
+      }
+      const double factor = matrix[row][column];
+      for (std::size_t element = 0; element < 4; ++element) {
+        matrix[row][element] -= factor * matrix[column][element];
+        inverse_matrix[row][element] -= factor * inverse_matrix[column][element];
+      }
+    }
+  }
+
+  return inverse_matrix;
 }
-F450WrenchConfig frozenF450WrenchConfig(){F450WrenchConfig c{};c.allocator_rotor_position_frd_m={Vec3{.159,.159,0},Vec3{-.159,-.159,0},Vec3{.159,-.159,0},Vec3{-.159,.159,0}};c.allocator_thrust_coefficient={6.5,6.5,6.5,6.5};c.allocator_yaw_moment_ratio={.014,.014,-.014,-.014};constexpr double a=.1626345596714;c.physical_rotor_position_frd_m={Vec3{a,a,0},Vec3{-a,-a,0},Vec3{a,-a,0},Vec3{-a,a,0}};c.physical_yaw_moment_ratio={.0137,.0137,-.0137,-.0137};c.motor_thrust_constant_n_per_radps2=1.2e-5;c.esc_speed_min_radps=150;c.esc_speed_max_radps=1000;c.collective_force_tolerance_n=1e-6;c.moment_tolerance_nm=1e-8;c.jacobian_condition_limit=1e4;c.max_iterations=20;return c;}
-F450WrenchModel::F450WrenchModel(F450WrenchConfig c):config_(c){if(!finiteCfg(config_))throw std::invalid_argument("invalid F450 wrench configuration");normalized_mixer_=makeMixer(config_);}
-F450ForwardState F450WrenchModel::forward(const Vec3&t,double thrust)const{F450ForwardState s{};s.normalized_torque_frd=t;s.normalized_collective_thrust=thrust;if(!t.finite()||!std::isfinite(thrust)||thrust<0||thrust>1||!inBounds(t)){s.reason="normalized wrench is outside PX4 bounds";return s;}std::array<double,4> u{t.x,t.y,t.z,-thrust};double span=config_.esc_speed_max_radps-config_.esc_speed_min_radps;for(size_t m=0;m<4;++m){for(size_t a=0;a<4;++a)s.motor_command[m]+=normalized_mixer_[m][a]*u[a];if(s.motor_command[m]<0||s.motor_command[m]>1){s.reason="raw PX4 allocation requires desaturation";return s;}s.rotor_speed_radps[m]=config_.esc_speed_min_radps+span*s.motor_command[m];s.rotor_thrust_n[m]=config_.motor_thrust_constant_n_per_radps2*s.rotor_speed_radps[m]*s.rotor_speed_radps[m];s.collective_thrust_n+=s.rotor_thrust_n[m];auto&p=config_.physical_rotor_position_frd_m[m];double f=s.rotor_thrust_n[m];s.body_moment_frd_nm.x+=-p.y*f;s.body_moment_frd_nm.y+=p.x*f;s.body_moment_frd_nm.z+=config_.physical_yaw_moment_ratio[m]*f;}s.ok=true;return s;}
-F450WrenchResult F450WrenchModel::normalize(double desired_f,const Vec3&desired_m,double thrust)const{F450WrenchResult r{};if(!std::isfinite(desired_f)||desired_f<0||!desired_m.finite()||!std::isfinite(thrust)||thrust<0||thrust>1){r.reason="invalid physical wrench or normalized thrust";return r;}r.normalized_thrust_body_frd={0,0,-thrust};auto capture=[&](const F450ForwardState&s,int it){r.normalized_torque_frd=s.normalized_torque_frd;r.motor_command=s.motor_command;r.rotor_speed_radps=s.rotor_speed_radps;r.rotor_thrust_n=s.rotor_thrust_n;r.reconstructed_collective_thrust_n=s.collective_thrust_n;r.reconstructed_body_moment_frd_nm=s.body_moment_frd_nm;r.collective_force_residual_n=s.collective_thrust_n-desired_f;r.iterations=it;};Vec3 torque{};for(int it=0;it<=config_.max_iterations;++it){auto s=forward(torque,thrust);if(!s.ok){r.status=F450WrenchStatus::infeasible;r.reason=s.reason;return r;}Vec3 res=desired_m-s.body_moment_frd_nm;if(res.norm()<=config_.moment_tolerance_nm){capture(s,it);if(std::abs(r.collective_force_residual_n)>config_.collective_force_tolerance_n){r.status=F450WrenchStatus::infeasible;r.reason="physical collective force does not match the common PX4 thrust command";return r;}r.ok=true;r.status=F450WrenchStatus::success;r.reason.clear();return r;}if(it==config_.max_iterations){r.status=F450WrenchStatus::no_convergence;r.reason="physical moment solve did not converge";return r;}Mat3 j=Mat3::zero();double span=config_.esc_speed_max_radps-config_.esc_speed_min_radps;for(size_t m=0;m<4;++m){Vec3 mp{-config_.physical_rotor_position_frd_m[m].y,config_.physical_rotor_position_frd_m[m].x,config_.physical_yaw_moment_ratio[m]};for(size_t a=0;a<3;++a){double td=2*config_.motor_thrust_constant_n_per_radps2*s.rotor_speed_radps[m]*span*normalized_mixer_[m][a];j(0,a)+=mp.x*td;j(1,a)+=mp.y*td;j(2,a)+=mp.z*td;}}Mat3 ji;try{ji=inverse(j);}catch(const std::invalid_argument&){r.status=F450WrenchStatus::singular_jacobian;r.reason="singular physical moment Jacobian";return r;}double cond=infNorm(j)*infNorm(ji);if(!std::isfinite(cond)||cond>config_.jacobian_condition_limit){r.status=F450WrenchStatus::singular_jacobian;r.reason="poorly conditioned physical moment Jacobian";return r;}Vec3 step=ji*res;bool accepted=false;double scale=1;for(int bt=0;bt<30;++bt){Vec3 cand=torque+scale*step;if(inBounds(cand)){auto cs=forward(cand,thrust);if(cs.ok&&(desired_m-cs.body_moment_frd_nm).norm()<res.norm()){torque=cand;accepted=true;break;}}scale*=.5;}if(!accepted){r.status=F450WrenchStatus::infeasible;r.reason="physical moment request exceeds raw allocator bounds";return r;}}r.status=F450WrenchStatus::no_convergence;r.reason="physical moment solve did not converge";return r;}
-} // namespace px4_offboard::vehicles::f450
+
+Matrix4 makeMixer(const F450WrenchConfig &config) {
+  Matrix4 effectiveness{};
+  for (std::size_t rotor = 0; rotor < 4; ++rotor) {
+    const double thrust_coefficient = config.allocator_thrust_coefficient[rotor];
+    const auto &position = config.allocator_rotor_position_frd_m[rotor];
+    effectiveness[0][rotor] = -thrust_coefficient * position.y;
+    effectiveness[1][rotor] = thrust_coefficient * position.x;
+    effectiveness[2][rotor] =
+        thrust_coefficient * config.allocator_yaw_moment_ratio[rotor];
+    effectiveness[3][rotor] = -thrust_coefficient;
+  }
+
+  auto mixer = invert4(effectiveness);
+  const auto axisScale = [&](std::size_t axis) {
+    double squared_norm = 0.0;
+    int non_zero = 0;
+    for (const auto &row : mixer) {
+      squared_norm += row[axis] * row[axis];
+      if (std::abs(row[axis]) > 1e-3) {
+        ++non_zero;
+      }
+    }
+    return non_zero ? std::sqrt(squared_norm / (static_cast<double>(non_zero) / 2.0)) : 0.0;
+  };
+
+  const double roll_pitch_scale = std::max(axisScale(0), axisScale(1));
+  double yaw_scale = -std::numeric_limits<double>::infinity();
+  double thrust_scale = 0.0;
+  int thrust_non_zero = 0;
+  for (const auto &row : mixer) {
+    yaw_scale = std::max(yaw_scale, row[2]);
+    if (std::abs(row[3]) > std::numeric_limits<float>::epsilon()) {
+      thrust_scale += std::abs(row[3]);
+      ++thrust_non_zero;
+    }
+  }
+  thrust_scale = thrust_non_zero ? thrust_scale / thrust_non_zero : 0.0;
+
+  if (!(roll_pitch_scale > kEps && yaw_scale > kEps && thrust_scale > kEps)) {
+    throw std::invalid_argument("invalid F450 allocator normalization scale");
+  }
+
+  // Preserve the frozen PX4 pseudo-inverse normalization used by the comparison baseline.
+  for (auto &row : mixer) {
+    row[0] /= roll_pitch_scale;
+    row[1] /= roll_pitch_scale;
+    row[2] /= yaw_scale;
+    row[3] /= thrust_scale;
+    for (double &value : row) {
+      if (std::abs(value) < 1e-3) {
+        value = 0.0;
+      }
+    }
+  }
+  return mixer;
+}
+
+bool finiteConfig(const F450WrenchConfig &config) {
+  for (std::size_t rotor = 0; rotor < 4; ++rotor) {
+    if (!config.allocator_rotor_position_frd_m[rotor].finite() ||
+        !config.physical_rotor_position_frd_m[rotor].finite() ||
+        !std::isfinite(config.allocator_thrust_coefficient[rotor]) ||
+        !std::isfinite(config.allocator_yaw_moment_ratio[rotor]) ||
+        !std::isfinite(config.physical_yaw_moment_ratio[rotor]) ||
+        !(config.allocator_thrust_coefficient[rotor] > 0.0)) {
+      return false;
+    }
+  }
+
+  return std::isfinite(config.motor_thrust_constant_n_per_radps2) &&
+         config.motor_thrust_constant_n_per_radps2 > 0.0 &&
+         std::isfinite(config.esc_speed_min_radps) && config.esc_speed_min_radps >= 0.0 &&
+         std::isfinite(config.esc_speed_max_radps) &&
+         config.esc_speed_max_radps > config.esc_speed_min_radps &&
+         std::isfinite(config.collective_force_tolerance_n) &&
+         config.collective_force_tolerance_n > 0.0 && std::isfinite(config.moment_tolerance_nm) &&
+         config.moment_tolerance_nm > 0.0 &&
+         std::isfinite(config.jacobian_condition_limit) && config.jacobian_condition_limit > 1.0 &&
+         config.max_iterations > 0;
+}
+
+double infinityNorm(const Mat3 &matrix) {
+  double norm = 0.0;
+  for (std::size_t row = 0; row < 3; ++row) {
+    double sum = 0.0;
+    for (std::size_t column = 0; column < 3; ++column) {
+      sum += std::abs(matrix(row, column));
+    }
+    norm = std::max(norm, sum);
+  }
+  return norm;
+}
+
+bool inBounds(const Vec3 &normalized_torque_frd) {
+  return std::abs(normalized_torque_frd.x) <= 1.0 &&
+         std::abs(normalized_torque_frd.y) <= 1.0 &&
+         std::abs(normalized_torque_frd.z) <= 1.0;
+}
+
+}  // namespace
+
+F450WrenchConfig frozenF450WrenchConfig() {
+  F450WrenchConfig config{};
+  config.allocator_rotor_position_frd_m =
+      {Vec3{0.159, 0.159, 0.0}, Vec3{-0.159, -0.159, 0.0},
+       Vec3{0.159, -0.159, 0.0}, Vec3{-0.159, 0.159, 0.0}};
+  config.allocator_thrust_coefficient = {6.5, 6.5, 6.5, 6.5};
+  config.allocator_yaw_moment_ratio = {0.014, 0.014, -0.014, -0.014};
+
+  constexpr double physical_arm_m = 0.1626345596714;
+  config.physical_rotor_position_frd_m =
+      {Vec3{physical_arm_m, physical_arm_m, 0.0},
+       Vec3{-physical_arm_m, -physical_arm_m, 0.0},
+       Vec3{physical_arm_m, -physical_arm_m, 0.0},
+       Vec3{-physical_arm_m, physical_arm_m, 0.0}};
+  config.physical_yaw_moment_ratio = {0.0137, 0.0137, -0.0137, -0.0137};
+  config.motor_thrust_constant_n_per_radps2 = 1.2e-5;
+  config.esc_speed_min_radps = 150.0;
+  config.esc_speed_max_radps = 1000.0;
+  config.collective_force_tolerance_n = 1e-6;
+  config.moment_tolerance_nm = 1e-8;
+  config.jacobian_condition_limit = 1e4;
+  config.max_iterations = 20;
+  return config;
+}
+
+F450WrenchModel::F450WrenchModel(F450WrenchConfig config) : config_(config) {
+  if (!finiteConfig(config_)) {
+    throw std::invalid_argument("invalid F450 wrench configuration");
+  }
+  normalized_mixer_ = makeMixer(config_);
+}
+
+F450ForwardState F450WrenchModel::forward(const Vec3 &normalized_torque_frd,
+                                          double normalized_collective_thrust) const {
+  F450ForwardState state{};
+  state.normalized_torque_frd = normalized_torque_frd;
+  state.normalized_collective_thrust = normalized_collective_thrust;
+  if (!normalized_torque_frd.finite() || !std::isfinite(normalized_collective_thrust) ||
+      normalized_collective_thrust < 0.0 || normalized_collective_thrust > 1.0 ||
+      !inBounds(normalized_torque_frd)) {
+    state.reason = "normalized wrench is outside PX4 bounds";
+    return state;
+  }
+
+  const std::array<double, 4> control{normalized_torque_frd.x, normalized_torque_frd.y,
+                                      normalized_torque_frd.z,
+                                      -normalized_collective_thrust};
+  const double speed_span = config_.esc_speed_max_radps - config_.esc_speed_min_radps;
+  for (std::size_t motor = 0; motor < 4; ++motor) {
+    for (std::size_t axis = 0; axis < 4; ++axis) {
+      state.motor_command[motor] += normalized_mixer_[motor][axis] * control[axis];
+    }
+    if (state.motor_command[motor] < 0.0 || state.motor_command[motor] > 1.0) {
+      state.reason = "raw PX4 allocation requires desaturation";
+      return state;
+    }
+
+    state.rotor_speed_radps[motor] =
+        config_.esc_speed_min_radps + speed_span * state.motor_command[motor];
+    state.rotor_thrust_n[motor] =
+        config_.motor_thrust_constant_n_per_radps2 * state.rotor_speed_radps[motor] *
+        state.rotor_speed_radps[motor];
+    state.collective_thrust_n += state.rotor_thrust_n[motor];
+
+    const auto &position = config_.physical_rotor_position_frd_m[motor];
+    const double thrust = state.rotor_thrust_n[motor];
+    state.body_moment_frd_nm.x += -position.y * thrust;
+    state.body_moment_frd_nm.y += position.x * thrust;
+    state.body_moment_frd_nm.z += config_.physical_yaw_moment_ratio[motor] * thrust;
+  }
+
+  state.ok = true;
+  return state;
+}
+
+F450WrenchResult F450WrenchModel::normalize(double desired_collective_force_n,
+                                            const Vec3 &desired_body_moment_frd_nm,
+                                            double normalized_collective_thrust) const {
+  F450WrenchResult result{};
+  if (!std::isfinite(desired_collective_force_n) || desired_collective_force_n < 0.0 ||
+      !desired_body_moment_frd_nm.finite() || !std::isfinite(normalized_collective_thrust) ||
+      normalized_collective_thrust < 0.0 || normalized_collective_thrust > 1.0) {
+    result.reason = "invalid physical wrench or normalized thrust";
+    return result;
+  }
+
+  result.normalized_thrust_body_frd = {0.0, 0.0, -normalized_collective_thrust};
+  const auto capture = [&](const F450ForwardState &state, int iterations) {
+    result.normalized_torque_frd = state.normalized_torque_frd;
+    result.motor_command = state.motor_command;
+    result.rotor_speed_radps = state.rotor_speed_radps;
+    result.rotor_thrust_n = state.rotor_thrust_n;
+    result.reconstructed_collective_thrust_n = state.collective_thrust_n;
+    result.reconstructed_body_moment_frd_nm = state.body_moment_frd_nm;
+    result.collective_force_residual_n =
+        state.collective_thrust_n - desired_collective_force_n;
+    result.iterations = iterations;
+  };
+
+  Vec3 normalized_torque{};
+  for (int iteration = 0; iteration <= config_.max_iterations; ++iteration) {
+    const auto state = forward(normalized_torque, normalized_collective_thrust);
+    if (!state.ok) {
+      result.status = F450WrenchStatus::infeasible;
+      result.reason = state.reason;
+      return result;
+    }
+
+    const Vec3 residual = desired_body_moment_frd_nm - state.body_moment_frd_nm;
+    if (residual.norm() <= config_.moment_tolerance_nm) {
+      capture(state, iteration);
+      if (std::abs(result.collective_force_residual_n) >
+          config_.collective_force_tolerance_n) {
+        result.status = F450WrenchStatus::infeasible;
+        result.reason =
+            "physical collective force does not match the common PX4 thrust command";
+        return result;
+      }
+      result.ok = true;
+      result.status = F450WrenchStatus::success;
+      result.reason.clear();
+      return result;
+    }
+    if (iteration == config_.max_iterations) {
+      result.status = F450WrenchStatus::no_convergence;
+      result.reason = "physical moment solve did not converge";
+      return result;
+    }
+
+    // Differentiate the physical rotor wrench through the frozen normalized mixer so Newton's
+    // step is solved in PX4 normalized torque coordinates.
+    Mat3 jacobian = Mat3::zero();
+    const double speed_span = config_.esc_speed_max_radps - config_.esc_speed_min_radps;
+    for (std::size_t motor = 0; motor < 4; ++motor) {
+      const Vec3 moment_per_force{-config_.physical_rotor_position_frd_m[motor].y,
+                                  config_.physical_rotor_position_frd_m[motor].x,
+                                  config_.physical_yaw_moment_ratio[motor]};
+      for (std::size_t axis = 0; axis < 3; ++axis) {
+        const double thrust_derivative =
+            2.0 * config_.motor_thrust_constant_n_per_radps2 *
+            state.rotor_speed_radps[motor] * speed_span * normalized_mixer_[motor][axis];
+        jacobian(0, axis) += moment_per_force.x * thrust_derivative;
+        jacobian(1, axis) += moment_per_force.y * thrust_derivative;
+        jacobian(2, axis) += moment_per_force.z * thrust_derivative;
+      }
+    }
+
+    Mat3 jacobian_inverse;
+    try {
+      jacobian_inverse = inverse(jacobian);
+    } catch (const std::invalid_argument &) {
+      result.status = F450WrenchStatus::singular_jacobian;
+      result.reason = "singular physical moment Jacobian";
+      return result;
+    }
+
+    const double condition = infinityNorm(jacobian) * infinityNorm(jacobian_inverse);
+    if (!std::isfinite(condition) || condition > config_.jacobian_condition_limit) {
+      result.status = F450WrenchStatus::singular_jacobian;
+      result.reason = "poorly conditioned physical moment Jacobian";
+      return result;
+    }
+
+    const Vec3 step = jacobian_inverse * residual;
+    bool accepted = false;
+    double scale = 1.0;
+    for (int backtrack = 0; backtrack < 30; ++backtrack) {
+      const Vec3 candidate = normalized_torque + scale * step;
+      if (inBounds(candidate)) {
+        const auto candidate_state = forward(candidate, normalized_collective_thrust);
+        if (candidate_state.ok &&
+            (desired_body_moment_frd_nm - candidate_state.body_moment_frd_nm).norm() <
+                residual.norm()) {
+          normalized_torque = candidate;
+          accepted = true;
+          break;
+        }
+      }
+      scale *= 0.5;
+    }
+
+    if (!accepted) {
+      result.status = F450WrenchStatus::infeasible;
+      result.reason = "physical moment request exceeds raw allocator bounds";
+      return result;
+    }
+  }
+
+  result.status = F450WrenchStatus::no_convergence;
+  result.reason = "physical moment solve did not converge";
+  return result;
+}
+
+}  // namespace px4_offboard::vehicles::f450
