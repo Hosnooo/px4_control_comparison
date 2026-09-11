@@ -11,6 +11,7 @@ class Ros2StubCompileTest(unittest.TestCase):
         for source in [
             ROOT / "src/ros2/px4_state_input.cpp",
             ROOT / "src/ros2/px4_command_publisher.cpp",
+            ROOT / "src/ros2/offboard_controller_node.cpp",
         ]:
             completed = subprocess.run(
                 [
