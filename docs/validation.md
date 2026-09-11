@@ -10,6 +10,10 @@ A host-only Debian run exercises ROS-independent math/controller behavior and co
 Gazebo Harmonic transport, DDS behavior, PX4 SITL dynamics, or flight safety. Those remain
 runtime-pending until run in the corresponding environment.
 
+Native PX4 validation additionally requires applying the checked-in, observability-only DDS patch
+that enables `/fmu/out/vehicle_angular_velocity` at the frozen PX4 gitlink. The host tests verify
+the patch scope but do not claim that a patched PX4 SITL image was built or run here.
+
 ## Runtime integration status
 
 The checked-in native boundary does not yet claim closed-loop execution of the controller math.

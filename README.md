@@ -29,8 +29,18 @@ python3 -m unittest discover -s test -p 'test_*.py' -v
 ```
 
 A ROS 2 Jazzy workspace with the dependencies in `package.xml` enables the ament/native PX4
-runtime. `controller` is a required launch argument; there is no F450 controller default.
-Gazebo direct position additionally requires explicit `world_name` and `model_name`.
+runtime. The frozen PX4 pin has `VehicleAngularVelocity` disabled in its DDS publication list, so
+apply the checked-in observability-only patch before building PX4:
+
+```sh
+(cd third_party/PX4-Autopilot && \
+  git apply --check ../patches/px4_vehicle_angular_velocity_dds.patch && \
+  git apply ../patches/px4_vehicle_angular_velocity_dds.patch)
+```
+
+The gitlink remains at the audited commit; see `docs/dependencies.md` for the exact pin and patch
+scope. `controller` is a required launch argument; there is no F450 controller default. Gazebo
+direct position additionally requires explicit `world_name` and `model_name`.
 
 See `docs/architecture.md`, `docs/controllers.md`, `docs/px4_interface.md`, and
 `docs/validation.md` before flight or SITL use. Host tests do not constitute native Jazzy,
