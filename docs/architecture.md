@@ -11,8 +11,10 @@ Hardware calibration lives under `experiment/calibration` for the same reason.
 
 The dependency direction is core -> controllers/PX4/state sources -> ROS orchestration, with the
 F450 and calibration implementations optional at the edge. A `.cpp` file belongs to one logical
-target. The default in-process trajectory/controller/command path uses C++ values and therefore
-adds no internal `/custom/*` ROS plumbing.
+target. Controller-domain trajectory, state, and command interfaces use C++ values and therefore
+add no internal `/custom/*` ROS plumbing. The native boundary node currently owns controller selection,
+required PX4 state subscriptions, the selected `OffboardControlMode` heartbeat, typed native
+publishers, and explicit `VehicleCommand` actions.
 
 World vectors use NED and body vectors use FRD. Gazebo position arrives in ENU and is converted
 once in `makeCanonicalGazeboPosition`; downstream controller code does not repeat frame changes.
