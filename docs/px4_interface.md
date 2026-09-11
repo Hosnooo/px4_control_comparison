@@ -11,11 +11,13 @@ It consumes native PX4 state from `/fmu/out/vehicle_local_position`,
 `/fmu/out/vehicle_status` as required by the selected controller. Streaming state subscriptions
 use sensor-data QoS in the native runtime.
 
-`OffboardControlMode` sets exactly the first active control level for the selected mode. Domain
-commands are converted to generated `px4_msgs` only at the ROS/PX4 boundary. Uncontrolled
+`OffboardControlMode` sets exactly the first active control level for the selected mode and the
+runtime streams that heartbeat at 10 Hz. Domain commands are converted to generated `px4_msgs`
+only at the ROS/PX4 boundary. Uncontrolled
 `TrajectorySetpoint` position/velocity/acceleration/jerk/yaw dimensions are NaN rather than zero,
 so PX4 does not interpret an unused dimension as an active zero command.
 
 PX4 timestamps are explicit microseconds on command-domain values. Wrench messages copy that
 command time into both `timestamp` and `timestamp_sample`. Arming and mode changes use explicit
-`VehicleCommand` actions and are not controller equations.
+`VehicleCommand` actions and are not controller equations or automatic side effects of selecting
+a controller.

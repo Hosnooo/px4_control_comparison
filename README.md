@@ -13,7 +13,7 @@ The canonical controller frames are world NED and body FRD.
 | `geometric_acceleration` | position/velocity feedback | position, velocity | `TrajectorySetpoint.acceleration` | acceleration normalization and below |
 | `geometric_attitude` | geometric outer loop to attitude | position, velocity, attitude | `VehicleAttitudeSetpoint` | attitude/rate/allocator |
 | `geometric_rate` | geometric outer loop and attitude error | position, velocity, attitude | `VehicleRatesSetpoint` | rate/allocator |
-| `px4_attitude_rate_mirror` | frozen PX4 attitude/rate mirror | attitude, body rate | normalized torque/thrust | allocator |
+| `px4_attitude_rate_mirror` | frozen PX4 attitude/rate mirror | attitude, body rate, body angular acceleration | normalized torque/thrust | allocator |
 | `lee_wrench` | Lee SE(3) force and moment | position, velocity, attitude, body rate | normalized torque/thrust | allocator |
 
 All PX4 traffic uses native `/fmu/in/*` and `/fmu/out/*` topics. Internal default controller stages

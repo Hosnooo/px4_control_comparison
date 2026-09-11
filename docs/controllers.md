@@ -14,7 +14,8 @@ margin, and combined thrust saturation.
 
 `Px4AttitudeRateController` mirrors the audited PX4 attitude/rate behavior used by the original
 comparison: reduced-attitude/yaw weighting, rate limiting, rate PID/FF, integration inhibition,
-dt clamping, yaw torque filtering, and optional battery scaling.
+dt clamping, yaw torque filtering, and optional battery scaling. Its rate stage consumes PX4's
+measured FRD body angular acceleration for the preserved D term.
 
 `LeeController` implements the audited Lee SE(3) force/moment equations in NED/FRD, including
 analytic desired-attitude derivatives and feed-forward angular acceleration. Its output is a
