@@ -1,102 +1,18 @@
 # Architecture
 
-## Goal
+The repository is one top-level `ament_cmake` package with narrow ownership boundaries.
+`px4_offboard_core` owns math, canonical NED/FRD state, and trajectory contracts.
+`px4_offboard_controllers_lib` owns ROS-independent controller equations.
+`px4_offboard_px4` owns domain commands and PX4 control-level mapping.
+`px4_offboard_state_sources` owns pure source selection/conversion.
+`px4_offboard_ros2_messages` is the generated-`px4_msgs` boundary when ROS is available.
+`px4_offboard_f450` is vehicle-specific and is never included by generic controller/PX4 headers.
+Hardware calibration lives under `experiment/calibration` for the same reason.
 
-Compare four placements of the multirotor control boundary while keeping trajectory, canonical state, outer-loop implementation, simulation vehicle, diagnostics schema, and executable codebase fixed.
+The dependency direction is core -> controllers/PX4/state sources -> ROS orchestration, with the
+F450 and calibration implementations optional at the edge. A `.cpp` file belongs to one logical
+target. The default in-process trajectory/controller/command path uses C++ values and therefore
+adds no internal `/custom/*` ROS plumbing.
 
-```text
-         canonical TrajectoryReference
-                    |
-    direct position + PX4 estimator state
-                    |
-             Lee translation
-                    |
-        desired force / attitude
-                    |
-    +---------------+---------------+----------------+----------------+
-    |                               |                |                |
- attitude_handoff              rate_handoff      px4_mirror       lee_wrench
-    |                               |                |                |
- PX4 normalized thrust         geometric rate    PX4 attitude     Lee moment N m
-    |                               |             + rate mirror       |
- VehicleAttitudeSetpoint       VehicleRates      normalized        physical torque
-    |                          Setpoint           torque/thrust     normalization
- PX4 attitude+rate                  |                |                |
-    +-------------------------------+----------------+----------------+
-                                    |
-                         PX4 control allocation
-                                    |
-                              motor outputs
-```
-
-## Canonical state
-
-`CanonicalState` intentionally combines independently sourced signals and retains each source timestamp/age:
-
-| Signal | Simulation | Experiment |
-|---|---|---|
-| primary position | direct Gazebo/model position, converted once to NED | raw Vicon position, converted once to NED |
-| diagnostic position | PX4 EKF | PX4 EKF |
-| velocity | PX4 EKF | PX4 EKF |
-| attitude | PX4 estimator | PX4 estimator |
-| body angular rate | PX4 `VehicleAngularVelocity.xyz` | same |
-| angular acceleration | PX4 `VehicleAngularVelocity.xyz_derivative` when required | same |
-
-No velocity is obtained by differentiating Vicon/Gazebo position. No independent rate derivative is created for the PX4 mirror.
-
-## Four boundaries
-
-### `attitude_handoff`
-
-Offboard computes trajectory, Lee translational force, desired attitude and PX4-normalized thrust. It publishes `VehicleAttitudeSetpoint`; PX4 owns attitude, rate, allocation and motor control.
-
-### `rate_handoff`
-
-Offboard adds the separate `GeometricRateController` and publishes `VehicleRatesSetpoint`. PX4 owns rate, allocation and motors.
-
-### `px4_mirror`
-
-Offboard runs a source-faithful mirror of the selected PX4 attitude and rate loops. It publishes normalized `VehicleTorqueSetpoint` and `VehicleThrustSetpoint`; PX4 owns allocation and motors.
-
-### `lee_wrench`
-
-Offboard runs the full physical Lee force/moment controller. Physical collective thrust [N] is converted through the PX4 thrust-normalization semantics; physical moment [N·m] is converted through a separate, provenance-aware `PhysicalTorqueNormalization`. PX4 owns allocation and motors.
-
-## PX4 command boundary
-
-Controller equations remain ROS-independent. `controller_handoff` maps the existing controller
-outputs into one explicit mode-specific command input, and `handoff` validates/serializes that input
-against the pinned PX4 message semantics. Failed validation produces no active offboard field or
-setpoint payload. The later ROS 2 node is therefore limited to state validation, clock/timestamp
-selection, copying source-shaped fields into generated `px4_msgs`, and publishing them.
-
-Exact message fields, frame/unit contracts, Offboard flags, and timestamp semantics are documented
-in `px4_handoff.md`.
-
-## Simulation and experiment adapters
-
-Only position-source adapters differ. Both feed the same direct-position message into the same controller. The controller always obtains velocity, attitude and rates from PX4. Experiment additionally sends the Vicon pose to PX4 external vision for EKF fusion; it does not estimate velocity.
-
-### Gazebo direct position
-
-The pinned F450 model is used unchanged. Gazebo's world `SceneBroadcaster` publishes
-`/world/default/pose/info` as `gz.msgs.Pose_V`; pinned PX4 selects the exact entry whose `Pose.name`
-matches the runtime model identity (`f450_0` for the first normally spawned instance). The
-transport-independent `simulation_position` library mirrors that identity rule,
-requires exactly one matching model pose, preserves simulation time and converts ENU position to NED
-through the existing frame helper exactly once.
-
-The runtime source binding lives in `simulation/ros2`. A thin Gazebo relay copies the selected raw
-pose onto an identity-specific `gz.msgs.Pose` topic, followed by a unidirectional `ros_gz_bridge`
-conversion to `geometry_msgs/msg/TransformStamped`. The ROS adapter verifies `frame_id` and
-`child_frame_id` before invoking the same canonical conversion. The package is source-implemented and
-compile-tested against local interface stubs; native ROS 2 Jazzy / Gazebo Harmonic build and SITL
-validation remain outstanding.
-
-## Low-level observability
-
-The frozen PX4 DDS YAML does not publish every signal required for research diagnostics. The ROS integration milestone will add a small auditable patch that enables only the required existing uORB publications over XRCE-DDS. That patch must not alter controller equations, allocator behavior, or state estimation.
-
-## Safety boundary
-
-Real hardware is never auto-armed by project default. `lee_wrench` hardware operation is rejected unless a measured hardware torque calibration passes schema, provenance, conditioning, residual and operating-range checks. Gazebo constants cannot satisfy that gate.
+World vectors use NED and body vectors use FRD. Gazebo position arrives in ENU and is converted
+once in `makeCanonicalGazeboPosition`; downstream controller code does not repeat frame changes.
