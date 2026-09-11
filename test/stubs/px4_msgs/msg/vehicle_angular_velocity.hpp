@@ -10,5 +10,6 @@ struct VehicleAngularVelocity {
   std::uint64_t timestamp{};
   std::uint64_t timestamp_sample{};
   std::array<float, 3> xyz{};
+  std::array<float, 3> xyz_derivative{};
 };
 }  // namespace px4_msgs::msg

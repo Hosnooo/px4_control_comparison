@@ -21,8 +21,8 @@ AccelerationCommandNed GeometricAccelerationController::compute(
     throw std::invalid_argument("missing geometric-acceleration inputs");
   }
 
-  const Vec3 position_error = *state.position_ned - *reference.position;
-  const Vec3 velocity_error = *state.velocity_ned - *reference.velocity;
+  const Vec3 position_error = state.position_ned->value - *reference.position;
+  const Vec3 velocity_error = state.velocity_ned->value - *reference.velocity;
 
   // Gravity is intentionally absent: PX4 owns gravity compensation below this setpoint boundary.
   return {*reference.acceleration - hadamard(position_gain_, position_error) -

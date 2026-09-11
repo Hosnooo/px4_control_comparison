@@ -13,6 +13,8 @@ class Ros2BoundaryImplementationTest(unittest.TestCase):
         self.assertIn("requirements.velocity", text)
         self.assertIn("requirements.attitude", text)
         self.assertIn("requirements.body_rate", text)
+        self.assertIn("requirements.body_angular_acceleration", text)
+        self.assertIn("xyz_derivative", text)
 
     def test_command_publisher_constructs_native_px4_publishers(self):
         text = (ROOT / "src/ros2/px4_command_publisher.cpp").read_text(encoding="utf-8")

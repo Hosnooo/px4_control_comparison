@@ -27,10 +27,10 @@ double matMaxAbs(const Mat3 &matrix) {
 
 CanonicalState hoverState() {
   CanonicalState state{};
-  state.position_ned = Vec3{0.0, 0.0, -1.0};
-  state.velocity_ned = Vec3{};
-  state.attitude_ned_frd = Quat{};
-  state.body_rate_frd = Vec3{};
+  state.position_ned = TimedValue<Vec3>{{0.0, 0.0, -1.0}, 0.0};
+  state.velocity_ned = TimedValue<Vec3>{Vec3{}, 0.0};
+  state.attitude_ned_frd = TimedValue<Quat>{Quat{}, 0.0};
+  state.body_rate_frd = TimedValue<Vec3>{Vec3{}, 0.0};
   return state;
 }
 
@@ -114,7 +114,7 @@ int main() {
   vecNear(output.attitude_error, {}, 1e-10, "hover attitude error");
   vecNear(output.body_moment_frd_nm, {}, 1e-10, "hover moment");
 
-  state.attitude_ned_frd = Quat::fromAxisAngle({1.0, 0.0, 0.0}, 0.12);
+  state.attitude_ned_frd = TimedValue<Quat>{Quat::fromAxisAngle({1.0, 0.0, 0.0}, 0.12), 0.0};
   const auto tilted = controller.update(state, reference);
   check(tilted.attitude_error.x > 0.0, "positive roll attitude error sign");
   check(tilted.body_moment_frd_nm.x < 0.0, "moment opposes positive roll error");
@@ -124,8 +124,8 @@ int main() {
   reference.yaw_accel = 0.4;
   state = hoverState();
   const auto desired = controller.update(state, reference);
-  state.attitude_ned_frd = Quat::fromMat3(desired.desired_rotation_ned_frd);
-  state.body_rate_frd = desired.desired_body_rate_frd_radps;
+  state.attitude_ned_frd = TimedValue<Quat>{Quat::fromMat3(desired.desired_rotation_ned_frd), 0.0};
+  state.body_rate_frd = TimedValue<Vec3>{desired.desired_body_rate_frd_radps, 0.0};
   const auto feedforward = controller.update(state, reference);
   vecNear(feedforward.attitude_error, {}, 1e-9, "feedforward zero attitude error");
   vecNear(feedforward.rate_error_frd_radps, {}, 1e-9, "feedforward zero rate error");
@@ -133,10 +133,10 @@ int main() {
             "yaw angular acceleration feedforward moment");
 
   state = hoverState();
-  state.position_ned = Vec3{0.15, -0.08, -1.1};
-  state.velocity_ned = Vec3{0.12, 0.03, -0.04};
-  state.attitude_ned_frd = Quat::fromAxisAngle({0.2, -0.3, 0.5}, 0.18);
-  state.body_rate_frd = Vec3{0.1, -0.08, 0.05};
+  state.position_ned = TimedValue<Vec3>{{0.15, -0.08, -1.1}, 0.0};
+  state.velocity_ned = TimedValue<Vec3>{{0.12, 0.03, -0.04}, 0.0};
+  state.attitude_ned_frd = TimedValue<Quat>{Quat::fromAxisAngle({0.2, -0.3, 0.5}, 0.18), 0.0};
+  state.body_rate_frd = TimedValue<Vec3>{{0.1, -0.08, 0.05}, 0.0};
   const double elapsed_s = 0.73;
   const double step_s = 1e-4;
   auto dynamic = figureEightReference({0.0, 0.0, -1.0}, 1.2, 0.7, 0.6, 0.2, elapsed_s);
