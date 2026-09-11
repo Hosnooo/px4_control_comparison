@@ -1,6 +1,9 @@
 #include "px4_offboard_controllers/core/state.hpp"
+#include "px4_offboard_controllers/px4/control_level.hpp"
 
 #include <array>
+#include <chrono>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -64,8 +67,19 @@ int main(int argc, char **argv) {
   px4_offboard::ros2_runtime::Px4StateInput state_input(
       *node, px4_offboard::requirementsFor(*controller_kind));
   px4_offboard::ros2_runtime::Px4CommandPublisher command_publisher(*node);
+  const auto control_level = px4_offboard::controlLevelFor(*controller_kind);
+
+  using namespace std::chrono_literals;
+  const auto heartbeat_timer = node->create_wall_timer(
+      100ms, [&command_publisher, node, control_level] {
+    const auto now_ns = node->get_clock()->now().nanoseconds();
+    if (now_ns > 0) {
+      command_publisher.publishControlMode(
+          control_level, static_cast<std::uint64_t>(now_ns / 1000));
+    }
+  });
   (void)state_input;
-  (void)command_publisher;
+  (void)heartbeat_timer;
 
   // Arming and mode changes are explicit VehicleCommand actions outside controller math. The
   // selected in-process controller owns only setpoint computation and the matching PX4 control

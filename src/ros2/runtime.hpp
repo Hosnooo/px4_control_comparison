@@ -53,6 +53,8 @@ class Px4CommandPublisher {
   void publish(const AttitudeCommand &command);
   void publish(const BodyRateCommand &command);
   void publish(const NormalizedWrenchCommand &command);
+  void publishArmCommand(bool arm, std::uint64_t timestamp_us);
+  void publishOffboardModeCommand(std::uint64_t timestamp_us);
   void publishVehicleCommand(const px4_msgs::msg::VehicleCommand &command);
 
  private:
