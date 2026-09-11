@@ -167,6 +167,8 @@ F450WrenchConfig frozenF450WrenchConfig() {
        Vec3{-physical_arm_m, physical_arm_m, 0.0}};
   config.physical_yaw_moment_ratio = {0.0137, 0.0137, -0.0137, -0.0137};
   config.motor_thrust_constant_n_per_radps2 = 1.2e-5;
+  // Frozen 4022_gz_f450 configures PX4's simulation ESC output as 150..1000. The F450 SDF's
+  // 1032 rad/s maxRotVelocity is a separate Gazebo motor-plugin hard limit, not this mapping.
   config.esc_speed_min_radps = 150.0;
   config.esc_speed_max_radps = 1000.0;
   config.collective_force_tolerance_n = 1e-6;

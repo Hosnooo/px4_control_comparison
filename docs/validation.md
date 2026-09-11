@@ -21,5 +21,9 @@ The implementation-plan checkpoint references an approved parameter/reference sp
 `docs/superpowers/specs/2026-09-10-px4-offboard-controllers-redesign.md`, but that file is absent
 from the checkpoint and from both repository branches. The refactor therefore does not invent
 controller gains, trajectory-source semantics, PX4-mirror auxiliary inputs, or a Lee wrench
-normalizer selection. The boundary fails short of claiming those semantics until the approved
-contract is recovered.
+normalizer selection. In particular, the frozen PX4 rate module consumes `VehicleLandDetected`
+for landed/maybe-landed behavior, `ControlAllocatorStatus` for directional saturation feedback,
+and optional `BatteryStatus.scale` for battery scaling. The current native runtime does not
+fabricate those inputs; the approved contract must define their selection/availability before the
+source-faithful mirror is wired into closed-loop execution. The boundary fails short of claiming
+those semantics until that contract is recovered.
