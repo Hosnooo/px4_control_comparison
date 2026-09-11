@@ -62,13 +62,28 @@ if(ament_cmake_FOUND)
   find_package(gz-msgs REQUIRED)
   find_package(gz_transport_vendor REQUIRED)
   find_package(gz-transport REQUIRED)
+endif()
 
-  add_library(px4_offboard_ros2_messages src/ros2/px4_message_adapter.cpp)
-  target_link_libraries(px4_offboard_ros2_messages PUBLIC px4_offboard_px4)
-  target_include_directories(px4_offboard_ros2_messages PUBLIC include)
-  ament_target_dependencies(px4_offboard_ros2_messages px4_msgs)
+# One logical owner for the native PX4 ROS boundary. Host builds compile the same sources against
+# audited stubs; native ament builds replace those includes with the generated ROS/PX4 interfaces.
+add_library(px4_offboard_ros2
+  src/ros2/px4_message_adapter.cpp
+  src/ros2/px4_state_input.cpp
+  src/ros2/px4_command_publisher.cpp)
+target_link_libraries(px4_offboard_ros2 PUBLIC px4_offboard_px4)
+target_include_directories(px4_offboard_ros2 PRIVATE src/ros2)
+if(ament_cmake_FOUND)
+  target_include_directories(px4_offboard_ros2 PUBLIC include)
+  ament_target_dependencies(px4_offboard_ros2 rclcpp px4_msgs)
+else()
+  target_include_directories(px4_offboard_ros2 PRIVATE test/stubs include)
+endif()
 
-  add_library(px4_offboard_gazebo_runtime SHARED
+add_executable(offboard_controller src/ros2/offboard_controller_node.cpp)
+target_link_libraries(offboard_controller PRIVATE px4_offboard_ros2)
+
+if(ament_cmake_FOUND)
+  add_library(px4_offboard_gazebo_runtime
     src/ros2/gazebo_pose_relay.cpp
     src/ros2/gazebo_position_ros.cpp)
   target_include_directories(px4_offboard_gazebo_runtime PRIVATE src/ros2)
@@ -81,28 +96,22 @@ if(ament_cmake_FOUND)
   target_link_libraries(gazebo_pose_relay
     PRIVATE px4_offboard_gazebo_runtime gz-transport::core)
 
-  add_executable(offboard_controller
-    src/ros2/offboard_controller_node.cpp
-    src/ros2/px4_state_input.cpp
-    src/ros2/px4_command_publisher.cpp)
-  target_link_libraries(offboard_controller PRIVATE
-    px4_offboard_core px4_offboard_controllers_lib px4_offboard_px4 px4_offboard_ros2_messages)
-  ament_target_dependencies(offboard_controller rclcpp px4_msgs)
-
-  install(TARGETS px4_offboard_controllers_lib px4_offboard_px4 px4_offboard_state_sources
-                  px4_offboard_f450 px4_offboard_ros2_messages px4_offboard_gazebo_runtime
-                  gazebo_pose_relay offboard_controller
-    DESTINATION lib/${PROJECT_NAME})
+  install(TARGETS
+      px4_offboard_core
+      px4_offboard_controllers_lib
+      px4_offboard_px4
+      px4_offboard_state_sources
+      px4_offboard_f450
+      px4_offboard_ros2
+      px4_offboard_gazebo_runtime
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib)
+  install(TARGETS gazebo_pose_relay offboard_controller
+    RUNTIME DESTINATION lib/${PROJECT_NAME})
   install(DIRECTORY include/ DESTINATION include)
   install(DIRECTORY vehicles/f450/include/ DESTINATION include)
   install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
   ament_package()
-else()
-  # Host-only builds intentionally exclude native ROS 2/Gazebo execution. Message conversion is
-  # still compiled below against audited field-shape stubs so the PX4 boundary remains testable.
-  add_executable(offboard_controller src/ros2/offboard_controller_node.cpp)
-  target_link_libraries(offboard_controller PRIVATE
-    px4_offboard_core px4_offboard_controllers_lib px4_offboard_px4)
 endif()
 
 if(BUILD_TESTING)
@@ -148,14 +157,9 @@ if(BUILD_TESTING)
     px4_offboard_hardware_calibration)
   add_test(NAME test_hardware_wrench_calibration COMMAND test_hardware_wrench_calibration)
 
-  if(NOT ament_cmake_FOUND)
-    add_library(px4_offboard_ros2_messages src/ros2/px4_message_adapter.cpp)
-    target_include_directories(px4_offboard_ros2_messages PUBLIC include test/stubs)
-    target_link_libraries(px4_offboard_ros2_messages PUBLIC px4_offboard_px4)
-  endif()
   add_executable(test_px4_message_adapter test/ros2/test_px4_message_adapter.cpp)
   target_include_directories(test_px4_message_adapter PRIVATE test/stubs)
-  target_link_libraries(test_px4_message_adapter PRIVATE px4_offboard_ros2_messages)
+  target_link_libraries(test_px4_message_adapter PRIVATE px4_offboard_ros2)
   add_test(NAME test_px4_message_adapter COMMAND test_px4_message_adapter)
 
   # Release defines NDEBUG globally, but host tests intentionally use <cassert> for contract checks.
