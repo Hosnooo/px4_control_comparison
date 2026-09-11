@@ -30,6 +30,11 @@ class CMakeTargetOwnershipTest(unittest.TestCase):
         self.assertNotIn("px4_command_publisher.cpp", executable.group(1))
         self.assertIn("px4_offboard_ros2", cmake)
 
+    def test_architecture_doc_names_current_ros2_target(self):
+        architecture = (ROOT / "docs/architecture.md").read_text(encoding="utf-8")
+        self.assertNotIn("px4_offboard_ros2_messages", architecture)
+        self.assertIn("`px4_offboard_ros2`", architecture)
+
     def test_gazebo_support_does_not_force_shared_linkage(self):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertNotIn("add_library(px4_offboard_gazebo_runtime SHARED", cmake)

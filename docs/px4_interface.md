@@ -8,8 +8,10 @@ The runtime publishes only native PX4 inputs:
 
 It consumes native PX4 state from `/fmu/out/vehicle_local_position`,
 `/fmu/out/vehicle_attitude`, `/fmu/out/vehicle_angular_velocity`, and
-`/fmu/out/vehicle_status` as required by the selected controller. Streaming state subscriptions
-use sensor-data QoS in the native runtime.
+`/fmu/out/vehicle_status` as required by the selected controller. `VehicleLocalPosition` supplies
+controller velocity; its PX4 EKF position does not become canonical primary position. Primary
+position remains owned by the selected direct state source. Streaming state subscriptions use
+sensor-data QoS in the native runtime.
 
 `OffboardControlMode` sets exactly the first active control level for the selected mode and the
 runtime streams that heartbeat at 10 Hz. Domain commands are converted to generated `px4_msgs`

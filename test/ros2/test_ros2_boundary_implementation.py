@@ -9,12 +9,17 @@ class Ros2BoundaryImplementationTest(unittest.TestCase):
         text = (ROOT / "src/ros2/px4_state_input.cpp").read_text(encoding="utf-8")
         self.assertIn("rclcpp::SensorDataQoS", text)
         self.assertGreaterEqual(text.count("create_subscription"), 4)
-        self.assertIn("requirements.position", text)
+        self.assertNotIn("state_.position_ned", text)
+        self.assertIn("updateFromPx4LocalPosition", text)
         self.assertIn("requirements.velocity", text)
         self.assertIn("requirements.attitude", text)
         self.assertIn("requirements.body_rate", text)
         self.assertIn("requirements.body_angular_acceleration", text)
         self.assertIn("xyz_derivative", text)
+
+    def test_px4_interface_does_not_claim_ekf_primary_position(self):
+        text = (ROOT / "docs/px4_interface.md").read_text(encoding="utf-8")
+        self.assertIn("does not become canonical primary position", text)
 
     def test_command_publisher_constructs_native_px4_publishers(self):
         text = (ROOT / "src/ros2/px4_command_publisher.cpp").read_text(encoding="utf-8")

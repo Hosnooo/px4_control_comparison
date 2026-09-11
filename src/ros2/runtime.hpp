@@ -22,6 +22,12 @@
 
 namespace px4_offboard::ros2_runtime {
 
+// PX4 local position is the authority for controller velocity only. Primary controller position
+// comes from the selected direct Gazebo/Vicon source and must not be overwritten by EKF position.
+void updateFromPx4LocalPosition(
+    CanonicalState &state, StateRequirements requirements,
+    const px4_msgs::msg::VehicleLocalPosition &message);
+
 class Px4StateInput {
  public:
   Px4StateInput(rclcpp::Node &node, StateRequirements requirements);

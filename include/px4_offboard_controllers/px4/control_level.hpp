@@ -18,8 +18,8 @@ constexpr OffboardControlLevel controlLevelFor(ControllerKind kind) {
     case ControllerKind::GeometricAttitude:
       return OffboardControlLevel::Attitude;
     case ControllerKind::GeometricRate:
-    case ControllerKind::Px4AttitudeRateMirror:
       return OffboardControlLevel::BodyRate;
+    case ControllerKind::Px4AttitudeRateMirror:
     case ControllerKind::LeeWrench:
       return OffboardControlLevel::Wrench;
   }

@@ -7,7 +7,7 @@ int main(){
  assert(controlLevelFor(ControllerKind::GeometricAcceleration)==OffboardControlLevel::Acceleration);
  assert(controlLevelFor(ControllerKind::GeometricAttitude)==OffboardControlLevel::Attitude);
  assert(controlLevelFor(ControllerKind::GeometricRate)==OffboardControlLevel::BodyRate);
- assert(controlLevelFor(ControllerKind::Px4AttitudeRateMirror)==OffboardControlLevel::BodyRate);
+ assert(controlLevelFor(ControllerKind::Px4AttitudeRateMirror)==OffboardControlLevel::Wrench);
  assert(controlLevelFor(ControllerKind::LeeWrench)==OffboardControlLevel::Wrench);
  assert(kTrajectorySetpointTopic=="/fmu/in/trajectory_setpoint");
  assert(kOffboardControlModeTopic=="/fmu/in/offboard_control_mode");

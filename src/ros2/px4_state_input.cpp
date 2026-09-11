@@ -18,34 +18,30 @@ double secondsFromMicroseconds(std::uint64_t timestamp_us) {
 
 }  // namespace
 
+void updateFromPx4LocalPosition(
+    CanonicalState &state, StateRequirements requirements,
+    const px4_msgs::msg::VehicleLocalPosition &message) {
+  if (!requirements.velocity) return;
+
+  const double timestamp_s =
+      secondsFromMicroseconds(sampleTimestamp(message.timestamp_sample, message.timestamp));
+  const Vec3 velocity{message.vx, message.vy, message.vz};
+  if (message.v_xy_valid && message.v_z_valid && velocity.finite()) {
+    state.velocity_ned = TimedValue<Vec3>{velocity, timestamp_s};
+  } else {
+    state.velocity_ned.reset();
+  }
+}
+
 Px4StateInput::Px4StateInput(rclcpp::Node &node, StateRequirements requirements) {
   const auto sensor_qos = rclcpp::SensorDataQoS();
 
-  if (requirements.position || requirements.velocity) {
+  if (requirements.velocity) {
     local_position_sub_ = node.create_subscription<px4_msgs::msg::VehicleLocalPosition>(
         kLocalPositionTopic, sensor_qos,
         [this, requirements](const px4_msgs::msg::VehicleLocalPosition::SharedPtr message) {
           std::lock_guard<std::mutex> lock(mutex_);
-          const double timestamp_s = secondsFromMicroseconds(
-              sampleTimestamp(message->timestamp_sample, message->timestamp));
-
-          if (requirements.position) {
-            const Vec3 position{message->x, message->y, message->z};
-            if (message->xy_valid && message->z_valid && position.finite()) {
-              state_.position_ned = TimedValue<Vec3>{position, timestamp_s};
-            } else {
-              state_.position_ned.reset();
-            }
-          }
-
-          if (requirements.velocity) {
-            const Vec3 velocity{message->vx, message->vy, message->vz};
-            if (message->v_xy_valid && message->v_z_valid && velocity.finite()) {
-              state_.velocity_ned = TimedValue<Vec3>{velocity, timestamp_s};
-            } else {
-              state_.velocity_ned.reset();
-            }
-          }
+          updateFromPx4LocalPosition(state_, requirements, *message);
         });
   }
 

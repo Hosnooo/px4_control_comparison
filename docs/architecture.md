@@ -5,7 +5,8 @@ The repository is one top-level `ament_cmake` package with narrow ownership boun
 `px4_offboard_controllers_lib` owns ROS-independent controller equations.
 `px4_offboard_px4` owns domain commands and PX4 control-level mapping.
 `px4_offboard_state_sources` owns pure source selection/conversion.
-`px4_offboard_ros2_messages` is the generated-`px4_msgs` boundary when ROS is available.
+`px4_offboard_ros2` owns generated-`px4_msgs` conversion plus native PX4 state input and
+command publication.
 `px4_offboard_f450` is vehicle-specific and is never included by generic controller/PX4 headers.
 Hardware calibration lives under `experiment/calibration` for the same reason.
 
